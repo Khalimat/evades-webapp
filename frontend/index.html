@@ -2,54 +2,256 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>EVADES</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Encyclopaedia of Bacterial Virus Anti-Defence Systems</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"></noscript>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
-  .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
-  .tab-btn { padding: 8px 16px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
-  .tab-btn.active { background: #333; color: white; }
-  .panel { display: none; }
+  :root {
+    --c-black: #1a1c1a;
+    --c-text: #1a1c1a;
+    --c-text-secondary: #373a36;
+    --c-muted: #707372;
+    --c-blue: #3b6fb6;
+    --c-blue-dark: #193f90;
+    --c-blue-light: #8bb8e8;
+    --c-purple: #563d82;
+    --c-border: #d0d0ce;
+    --c-bg-tint: #f3f3f3;
+    --font-sans: "IBM Plex Sans", Helvetica, Arial, sans-serif;
+    --font-mono: "IBM Plex Mono", Monaco, Consolas, "Lucida Console", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--c-text);
+    margin: 0;
+    background: #fff;
+    line-height: 1.5;
+  }
+
+  a { color: var(--c-blue); }
+  a:hover, a:focus { color: var(--c-blue-dark); }
+  a:visited { color: var(--c-purple); }
+
+  .masthead {
+    background: var(--c-black);
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .masthead-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .masthead-inner span { opacity: 0.85; }
+
+  .title-band {
+    background: var(--c-blue-dark);
+    color: #fff;
+    border-bottom: 4px solid var(--c-blue);
+  }
+  .title-band-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 28px 20px 22px;
+  }
+  .title-band h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .title-band p {
+    margin: 6px 0 0;
+    font-size: 15px;
+    color: var(--c-blue-light);
+  }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-top: 0;
+    border-bottom: 1px solid var(--c-border);
+  }
+  .tab-btn {
+    font-family: var(--font-sans);
+    padding: 14px 20px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    box-shadow: none;
+    color: var(--c-text-secondary);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .tab-btn:hover { color: var(--c-blue-dark); }
+  .tab-btn.active {
+    background: transparent;
+    color: var(--c-blue-dark);
+    border-bottom-color: var(--c-blue);
+    font-weight: 600;
+  }
+  a.tab-btn { text-decoration: none; display: inline-block; }
+
+  .panel { display: none; padding-top: 28px; }
   .panel.active { display: block; }
-  table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-  td, th { border: 1px solid #ddd; padding: 6px 10px; font-size: 14px; }
-  th { background: #f0f0f0; }
-  #status { margin-top: 12px; font-style: italic; color: #555; }
-  .download-links a { display: block; margin: 6px 0; }
+
+  h2 {
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--c-text);
+    border-left: 4px solid var(--c-blue);
+    padding-left: 10px;
+    margin: 0 0 12px;
+  }
+
+  .download-links {
+    background: var(--c-bg-tint);
+    border: 1px solid var(--c-border);
+    padding: 16px 20px;
+  }
+  .download-links a {
+    display: block;
+    margin: 8px 0;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .download-links a:hover { text-decoration: underline; }
+
+  input[type="file"] {
+    font-family: var(--font-sans);
+    display: block;
+    margin: 10px 0;
+  }
+
+  button {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 22px;
+    background: var(--c-blue);
+    color: #fff;
+    border: 2px solid var(--c-blue);
+    box-shadow: 3px 3px 0 var(--c-blue-dark);
+    cursor: pointer;
+    transition: transform 0.05s ease;
+  }
+  button:hover { background: var(--c-blue-dark); border-color: var(--c-blue-dark); }
+  button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--c-blue-dark); }
+
+  #downloadResultsBtn {
+    background: #fff;
+    color: var(--c-blue);
+    box-shadow: 3px 3px 0 var(--c-blue);
+  }
+  #downloadResultsBtn:hover { background: var(--c-bg-tint); color: var(--c-blue-dark); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 16px;
+    font-size: 14px;
+  }
+  td, th {
+    border: 1px solid var(--c-border);
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th {
+    background: var(--c-bg-tint);
+    color: var(--c-text);
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: #fafafa; }
+
+  #status {
+    margin-top: 14px;
+    font-style: italic;
+    color: var(--c-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  footer {
+    max-width: 1100px;
+    margin: 40px auto 0;
+    padding: 20px 20px 40px;
+    border-top: 1px solid var(--c-border);
+    color: var(--c-muted);
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
-  <h1>EVADES</h1>
 
-  <div class="tabs">
-    <button class="tab-btn active" data-tab="download">Download</button>
-    <button class="tab-btn" data-tab="analyse">Analyse</button>
-  </div>
-
-  <div id="download" class="panel active">
-    <h2>Bulk downloads</h2>
-    <div class="download-links">
-      <a href="/downloads/hmm_profiles.tar.gz">All HMM profiles (.tar.gz)</a>
-      <a href="/downloads/predicted_structures.tar.gz">All predicted structures (.tar.gz)</a>
-      <a href="/downloads/sequences.fasta">All amino acid sequences (multi-FASTA)</a>
-      <a href="/downloads/metadata.tsv">Full metadata table (.tsv)</a>
+  <div class="masthead">
+    <div class="masthead-inner">
+      <span>Bacterial virus anti-defence systems &middot; sequence &amp; structure resource</span>
     </div>
   </div>
 
-  <div id="analyse" class="panel">
-    <h2>Sequence search (HMM)</h2>
-    <p>Upload a multi-FASTA of protein sequences to search against the EVADES HMM library.</p>
-    <input type="file" id="fastaInput" accept=".fasta,.fa,.faa">
-    <button onclick="submitHmm()">Run search</button>
-
-    <h2 style="margin-top:32px">Structure search (Foldseek)</h2>
-    <p>Upload a single PDB/mmCIF structure to search against the 268 EVADES structures.</p>
-    <input type="file" id="pdbInput" accept=".pdb,.cif">
-    <button onclick="submitStructure()">Run search</button>
-
-    <div id="status"></div>
-    <button id="downloadResultsBtn" style="display:none; margin-top:10px;" onclick="downloadResultsCsv()">Download results (CSV)</button>
-    <div id="results"></div>
+  <div class="title-band">
+    <div class="title-band-inner">
+      <h1>Encyclopaedia of Bacterial Virus Anti-Defence Systems</h1>
+      <p>Curated HMM profiles and predicted structures for phage anti-defence proteins</p>
+    </div>
   </div>
+
+  <div class="page">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="download">Download</button>
+      <button class="tab-btn" data-tab="analyse">Analyse</button>
+      <a class="tab-btn" href="https://www.ebi.ac.uk/finn-srv/evades/protein_list/" target="_blank" rel="noopener noreferrer">Explore</a>
+    </div>
+
+    <div id="download" class="panel active">
+      <h2>Bulk downloads</h2>
+      <div class="download-links">
+        <a href="/downloads/hmm_profiles.tar.gz">All HMM profiles (.tar.gz)</a>
+        <a href="/downloads/predicted_structures.tar.gz">All predicted structures (.tar.gz)</a>
+        <a href="/downloads/sequences.fasta">All amino acid sequences (multi-FASTA)</a>
+        <a href="/downloads/metadata.tsv">Full metadata table (.tsv)</a>
+      </div>
+    </div>
+
+    <div id="analyse" class="panel">
+      <h2>Sequence search (HMM)</h2>
+      <p>Upload a multi-FASTA of protein sequences to search against the Encyclopaedia of Bacterial Virus Anti-Defence Systems HMM library.</p>
+      <input type="file" id="fastaInput" accept=".fasta,.fa,.faa">
+      <button onclick="submitHmm()">Run search</button>
+
+      <h2 style="margin-top:32px">Structure search (Foldseek)</h2>
+      <p>Upload a single PDB/mmCIF structure to search against the 268 anti-defence structures in the encyclopaedia.</p>
+      <input type="file" id="pdbInput" accept=".pdb,.cif">
+      <button onclick="submitStructure()">Run search</button>
+
+      <div id="status"></div>
+      <button id="downloadResultsBtn" style="display:none; margin-top:10px;" onclick="downloadResultsCsv()">Download results (CSV)</button>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <footer>
+    Encyclopaedia of Bacterial Virus Anti-Defence Systems
+  </footer>
 
 <script src="app.js"></script>
 </body>
