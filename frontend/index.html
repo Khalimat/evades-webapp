@@ -33,6 +33,9 @@
     margin: 0;
     background: #fff;
     line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
 
   a { color: var(--c-blue); }
@@ -235,7 +238,7 @@
   footer {
     width: 88vw;
     max-width: 1600px;
-    margin: 40px auto 0;
+    margin: auto auto 0; /* pushed to the bottom of the viewport — see body's flex column */
     padding: 20px 20px 40px;
     border-top: 1px solid var(--c-border);
     color: var(--c-muted);
@@ -313,7 +316,7 @@
     <div class="cite-us">
       <p class="cite-us-heading">Cite us</p>
       <p class="cite-us-text">EVADES: Encyclopaedia of bacterial virus anti-defence systems</p>
-      <p class="cite-us-text">Khalimat Murtazalieva, Evangelos Karatzas, Jiawei Wang, Robert D. Finn<sup>*</sup></p>
+      <p class="cite-us-text">Khalimat Murtazalieva, Evangelos Karatzas, Jiawei Wang, Robert D. Finn</p>
     </div>
     Encyclopaedia of Bacterial Virus Anti-Defence Systems
   </footer>
