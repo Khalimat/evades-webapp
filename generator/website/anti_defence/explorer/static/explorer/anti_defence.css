@@ -1,3 +1,9 @@
+/* Match the main site's blue palette (frontend/index.html --c-blue*)
+   instead of the EBI Visual Framework's default green hero. */
+.vf-hero.vf-hero--400 {
+    background-color: #193f90 !important; /* --c-blue-dark */
+}
+
 /* Navigation bar */
 .vf-navigation__link {
     padding: 0.5rem 1rem;
@@ -11,7 +17,7 @@
 }
 
 .vf-navigation__link.is-active {
-    background-color: #005ea5; /* EMBlue */
+    background-color: #3b6fb6; /* --c-blue */
     color: white !important;   /* Contrast text */
     font-weight: 600;
 }
@@ -122,7 +128,7 @@ nightingale-manager {
 }
 
 .letter-btn.active {
-    background-color: #007bff; /* Blue highlight */
+    background-color: #3b6fb6; /* --c-blue */
     color: white;
     font-weight: bold;
 }

@@ -6,12 +6,12 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description"
-            content="Encyclopedia of Viral Anti-DefencE Systems" />
+            content="Encyclopaedia of Bacterial Virus Anti-Defence Systems" />
         <meta name="keywords"
             content="Anti-defence, protein, phages" />
         <title>
             {% block title %}
-            Encyclopedia of Viral Anti-DefencE Systems
+            Encyclopaedia of Bacterial Virus Anti-Defence Systems
             {% endblock title %}
         </title>
         <link rel="shortcut icon"
@@ -54,8 +54,8 @@
     {% include "base/header.html" %}
     <section style="--vf-hero--bg-image: url('{{ base_url }}{% static "explorer/banner.jpg" %}'); margin-top: 0" class="vf-hero vf-hero--400 | vf-u-fullbleed">
         <div class="vf-hero__content | vf-box | vf-stack vf-stack--400">
-            {% if request.resolver_match.url_name in "home" %}<p class="vf-hero__kicker">Encyclopedia of Viral Anti-DefencE Systems</p>{% endif %}
-            <h1 class="vf-hero__heading">Encyclopedia of Viral Anti-DefencE Systems</h1>
+            {% if request.resolver_match.url_name in "home" %}<p class="vf-hero__kicker">Encyclopaedia of Bacterial Virus Anti-Defence Systems</p>{% endif %}
+            <h1 class="vf-hero__heading">Encyclopaedia of Bacterial Virus Anti-Defence Systems</h1>
             <p class="vf-hero__text">
                 A comprehensive database of phage anti-defence proteins used to evade bacterial defence systems.
             </p>
@@ -64,8 +64,11 @@
     <nav class="vf-navigation vf-navigation--main | vf-cluster">
         <ul class="vf-navigation__list | vf-list | vf-cluster__inner">
             <li class="vf-navigation__item">
+            <a href="/" class="vf-navigation__link">&larr; Home (Download / Analyse)</a>
+        </li>
+        <li class="vf-navigation__item">
             <a href="{% url 'index' %}"
-            class="vf-navigation__link {% if request.resolver_match.url_name == 'index' %}is-active{% endif %}">Home</a>
+            class="vf-navigation__link {% if request.resolver_match.url_name == 'index' %}is-active{% endif %}">Search</a>
         </li>
         <li class="vf-navigation__item">
             <a href="{% url 'protein_list' %}"
