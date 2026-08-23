@@ -8,6 +8,13 @@
     font-size: 13px;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    /* body.vf-body is itself capped at 88vw/1600px (see below), so
+       without this the black bar would only span that width instead
+       of the full viewport like frontend/index.html's .masthead. */
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
 }
 .masthead-inner {
     width: 88vw;
