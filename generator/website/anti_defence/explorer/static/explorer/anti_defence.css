@@ -16,6 +16,41 @@
     left: 50%;
     transform: translateX(-50%);
 }
+
+/* Sticky footer, same as frontend/index.html's body. */
+body.vf-body {
+    min-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Same "Cite us" section/footer as frontend/index.html. */
+.site-footer {
+    width: 88vw;
+    max-width: 1600px;
+    margin: auto auto 0;
+    padding: 20px 20px 40px;
+    border-top: 1px solid #d0d0ce; /* --c-border */
+    color: #707372; /* --c-muted */
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.cite-us {
+    margin-bottom: 16px;
+}
+.cite-us-heading {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #707372; /* --c-muted */
+}
+.cite-us-text {
+    margin: 0 0 2px;
+    font-size: 12px;
+    color: #707372; /* --c-muted */
+}
 .masthead-inner {
     width: 88vw;
     max-width: 1600px;
