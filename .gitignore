@@ -1,0 +1,33 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Env / secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# Generated / downloaded scientific data — large binary artifacts that
+# are built locally per data/README.md, not source code. Keep the
+# directory structure (via .gitkeep) but not the contents.
+data/hmm/*
+!data/hmm/.gitkeep
+data/foldseek/*
+!data/foldseek/.gitkeep
+data/downloads/*
+!data/downloads/.gitkeep
+data/uploads/*
+!data/uploads/.gitkeep
+
+# Editors
+.vscode/
+.idea/

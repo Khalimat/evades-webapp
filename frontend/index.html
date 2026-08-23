@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EVADES</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
+  .tab-btn { padding: 8px 16px; border: 1px solid #ccc; background: #f5f5f5; cursor: pointer; }
+  .tab-btn.active { background: #333; color: white; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+  td, th { border: 1px solid #ddd; padding: 6px 10px; font-size: 14px; }
+  th { background: #f0f0f0; }
+  #status { margin-top: 12px; font-style: italic; color: #555; }
+  .download-links a { display: block; margin: 6px 0; }
+</style>
+</head>
+<body>
+  <h1>EVADES</h1>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="download">Download</button>
+    <button class="tab-btn" data-tab="analyse">Analyse</button>
+  </div>
+
+  <div id="download" class="panel active">
+    <h2>Bulk downloads</h2>
+    <div class="download-links">
+      <a href="/downloads/hmm_profiles.tar.gz">All HMM profiles (.tar.gz)</a>
+      <a href="/downloads/predicted_structures.tar.gz">All predicted structures (.tar.gz)</a>
+      <a href="/downloads/sequences.fasta">All amino acid sequences (multi-FASTA)</a>
+      <a href="/downloads/metadata.tsv">Full metadata table (.tsv)</a>
+    </div>
+  </div>
+
+  <div id="analyse" class="panel">
+    <h2>Sequence search (HMM)</h2>
+    <p>Upload a multi-FASTA of protein sequences to search against the EVADES HMM library.</p>
+    <input type="file" id="fastaInput" accept=".fasta,.fa,.faa">
+    <button onclick="submitHmm()">Run search</button>
+
+    <h2 style="margin-top:32px">Structure search (Foldseek)</h2>
+    <p>Upload a single PDB/mmCIF structure to search against the 268 EVADES structures.</p>
+    <input type="file" id="pdbInput" accept=".pdb,.cif">
+    <button onclick="submitStructure()">Run search</button>
+
+    <div id="status"></div>
+    <button id="downloadResultsBtn" style="display:none; margin-top:10px;" onclick="downloadResultsCsv()">Download results (CSV)</button>
+    <div id="results"></div>
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html>

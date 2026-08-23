@@ -1,0 +1,61 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: evades
+      POSTGRES_PASSWORD: evades
+      POSTGRES_DB: evades
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    networks: [main]
+
+  redis:
+    image: redis:7-alpine
+    networks: [main]
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://evades:evades@db:5432/evades
+      REDIS_URL: redis://redis:6379/0
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - ./data:/data
+      - uploads:/data/uploads
+    depends_on: [db, redis]
+    networks: [main]
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: ../worker/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://evades:evades@db:5432/evades
+      REDIS_URL: redis://redis:6379/0
+      FOLDSEEK_TM_SCORE_MIN: "0.5"   # "same fold" cutoff (TM-score convention)
+    volumes:
+      - ./data:/data          # HMM DB + Foldseek DB, read by tasks.py
+      - uploads:/data/uploads # same uploaded-file volume as the api container
+    depends_on: [db, redis]
+    networks: [main]
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./data/downloads:/data/downloads:ro
+    depends_on: [api]
+    networks: [main]
+
+volumes:
+  db_data:
+  uploads:
+
+networks:
+  main:
+    driver: bridge
