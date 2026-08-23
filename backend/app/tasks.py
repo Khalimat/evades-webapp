@@ -22,23 +22,34 @@ METADATA_TSV = DATA_DIR / "downloads" / "metadata.tsv"      # curated EVADES pro
 
 
 @functools.lru_cache(maxsize=1)
-def _load_metadata() -> dict[str, str]:
-    """protein ID -> semicolon-joined inhibited-defence name(s), from
-    the same metadata.tsv the bulk-download/Explore pages are built
-    from. Cheap enough (268 rows) to load fully and cache once."""
+def _load_metadata() -> dict[str, dict[str, str]]:
+    """protein ID -> {"defence": ..., "moa": ...}, from the same
+    metadata.tsv the bulk-download/Explore pages are built from.
+    Cheap enough (268 rows) to load fully and cache once."""
     if not METADATA_TSV.exists():
         return {}
+
+    def clean(value: str | None) -> str:
+        return value if value not in (None, "", "_") else ""
+
     with METADATA_TSV.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
         return {
-            row["ID"]: row.get("Defences", "")
+            row["ID"]: {
+                "defence": clean(row.get("Defences")),
+                "moa": clean(row.get("MoA")),
+            }
             for row in reader
-            if row.get("ID") and row.get("Defences") not in (None, "", "_")
+            if row.get("ID")
         }
 
 
 def _inhibited_defence(protein_id: str) -> str:
-    return _load_metadata().get(protein_id, "")
+    return _load_metadata().get(protein_id, {}).get("defence", "")
+
+
+def _moa(protein_id: str) -> str:
+    return _load_metadata().get(protein_id, {}).get("moa", "")
 
 # Some source PDBs (e.g. NMR structures) contained many models of the
 # same chain. foldseek createdb indexes each model as its own entry,
@@ -103,6 +114,7 @@ def _parse_domtblout(path: Path) -> list[dict]:
             hits.append({
                 "query_name": fields[0],
                 "adp": adp,
+                "moa": _moa(adp),
                 "defence": _inhibited_defence(adp),
                 "evalue": float(fields[6]),
                 "score": float(fields[7]),
@@ -203,13 +215,15 @@ def run_foldseek(pdb_path: str) -> dict:
 
         hits = sorted(best_by_protein.values(), key=lambda h: -h["prob"])
         for hit in hits:
+            hit["moa"] = _moa(hit["adp"])
             hit["defence"] = _inhibited_defence(hit["adp"])
-        # Reorder so "defence" sits right after "adp" (dict field order
-        # drives the frontend table's column order).
+        # Reorder so "moa"/"defence" sit right after "adp" (dict field
+        # order drives the frontend table's column order).
         hits = [
             {
                 "query": h["query"],
                 "adp": h["adp"],
+                "moa": h["moa"],
                 "defence": h["defence"],
                 "seq_identity": h["seq_identity"],
                 "aln_len": h["aln_len"],

@@ -22,6 +22,7 @@ const COLUMN_LABELS = {
   query_name: "Query",
   query: "Query",
   adp: "ADP",
+  moa: "MoA",
   defence: "Inhibited Defence",
   evalue: "E-value",
   score: "Score",
@@ -64,9 +65,9 @@ function renderResults(job) {
   }
   const hits = job.result.hits;
   const cols = Object.keys(hits[0]);
-  let html = "<table><thead><tr>" + cols.map(c => `<th>${COLUMN_LABELS[c] || c}</th>`).join("") + "</tr></thead><tbody>";
+  let html = "<table><thead><tr>" + cols.map(c => `<th class="col-${c}">${COLUMN_LABELS[c] || c}</th>`).join("") + "</tr></thead><tbody>";
   for (const hit of hits) {
-    html += "<tr>" + cols.map(c => `<td>${renderCell(c, hit[c])}</td>`).join("") + "</tr>";
+    html += "<tr>" + cols.map(c => `<td class="col-${c}">${renderCell(c, hit[c])}</td>`).join("") + "</tr>";
   }
   html += "</tbody></table>";
   el.innerHTML = html;
