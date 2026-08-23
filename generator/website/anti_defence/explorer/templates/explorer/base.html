@@ -64,10 +64,6 @@
             <a href="/" class="vf-navigation__link">&larr; Home (Download / Analyse)</a>
         </li>
         <li class="vf-navigation__item">
-            <a href="{% url 'index' %}"
-            class="vf-navigation__link {% if request.resolver_match.url_name == 'index' %}is-active{% endif %}">Search</a>
-        </li>
-        <li class="vf-navigation__item">
             <a href="{% url 'protein_list' %}"
             class="vf-navigation__link {% if request.resolver_match.url_name == 'protein_list' %}is-active{% endif %}">Browse</a>
         </li>
