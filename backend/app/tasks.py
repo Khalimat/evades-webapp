@@ -24,12 +24,9 @@ FOLDSEEK_DB = DATA_DIR / "foldseek" / "evades_structures_db"  # `foldseek create
 # to the base protein name so results can be collapsed per-protein.
 MODEL_SUFFIX_RE = re.compile(r"_MODEL_\d+_[A-Za-z0-9]+$")
 
-
 # TM-score >= 0.5 is the standard structural-biology convention for
 # "generally the same fold" (Zhang & Skolnick, 2004); below ~0.17 is
-# essentially random similarity. This is separate from e-value: a hit
-# can be statistically significant without being the same fold, or
-# vice versa on short/partial alignments.
+# essentially random similarity.
 FOLDSEEK_TM_SCORE_MIN = float(os.environ.get("FOLDSEEK_TM_SCORE_MIN", "0.5"))
 
 
@@ -115,7 +112,7 @@ def run_foldseek(pdb_path: str) -> dict:
                                        # at 268 structures, and needed for a
                                        # trustworthy "same fold" TM-score
             "--tmscore-threshold", str(FOLDSEEK_TM_SCORE_MIN),
-            # NOTE: do NOT use -e/FOLDSEEK_EVALUE here. Under
+            # NOTE: do NOT use -e for filtering here. Under
             # --alignment-type 1, Foldseek redefines the "evalue"
             # output field to be (qTMscore+tTMscore)/2 — a TM-score-
             # like value where HIGHER is better, not a real
@@ -124,7 +121,13 @@ def run_foldseek(pdb_path: str) -> dict:
             # real hits. --tmscore-threshold is the correct filter
             # for this mode.
             "--format-output",
-            "query,target,fident,alnlen,evalue,bits,prob,alntmscore",
+            # No "evalue" or "bits" columns: under --alignment-type 1
+            # both are repurposed by Foldseek — evalue becomes
+            # (qTM+tTM)/2, bits becomes qTM*100 — neither is the
+            # traditional statistic the name implies, and both are
+            # redundant with tm_score (alntmscore) and prob, which
+            # already convey match quality correctly.
+            "query,target,fident,alnlen,prob,alntmscore",
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=250)
         if proc.returncode != 0:
@@ -135,17 +138,21 @@ def run_foldseek(pdb_path: str) -> dict:
             with results_tsv.open() as f:
                 reader = csv.reader(f, delimiter="\t")
                 for row in reader:
-                    if len(row) < 8:
+                    if len(row) < 6:
                         continue
                     hits.append({
                         "query": row[0],
                         "target_structure": row[1],
                         "seq_identity": float(row[2]),
                         "aln_len": int(row[3]),
-                        "evalue": float(row[4]),
-                        "bit_score": float(row[5]),
-                        "prob": float(row[6]),
-                        "tm_score": float(row[7]),
+                        "prob": float(row[4]),
+                        # TM-score is mathematically bounded to (0, 1];
+                        # floating-point rounding on near-perfect
+                        # matches can occasionally push the raw value
+                        # a hair above 1.0 even with exact TM-align.
+                        # Clamp for display — the underlying match is
+                        # still valid, just capped at its true ceiling.
+                        "tm_score": min(float(row[5]), 1.0),
                     })
 
         # "Same fold" filter: TM-score >= FOLDSEEK_TM_SCORE_MIN. Already
