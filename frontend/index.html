@@ -181,29 +181,38 @@
     font-weight: 600;
   }
   tbody tr:nth-child(even) { background: #fafafa; }
-  /* The results table's columns (esp. col-moa) can need more room
-     than the 1100px page — scope any overflow to this box instead of
-     letting it stretch/shift the whole centered .page layout. */
+  /* Break the results table out of the 1100px .page column so it can
+     use most of the viewport width, independent of the rest of the
+     page's narrower text/upload content. */
   #results {
-    overflow-x: auto;
+    width: 88vw;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    overflow-x: auto; /* safety net if a column still needs more room */
   }
+  /* table-layout: fixed makes column widths deterministic — set from
+     the header row and never exceeded by content — which is what
+     reliably caps col-query_name/col-query at 15% (a percentage
+     max-width under the default "auto" layout is only a hint and
+     browsers routinely let wide unwrapped content blow past it). */
   #results table {
-    width: auto;
-    min-width: 100%;
+    width: 100%;
+    table-layout: fixed;
   }
-  #results td {
-    max-width: 320px;
+  #results td, #results th {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  #results .col-query_name, #results .col-query {
+    width: 15%;
+  }
   #results .col-moa {
-    min-width: 240px;
-    max-width: 400px;
+    width: 28%;
   }
   #results .col-defence {
-    min-width: 160px;
-    max-width: 220px;
+    width: 14%;
   }
 
   #status {
