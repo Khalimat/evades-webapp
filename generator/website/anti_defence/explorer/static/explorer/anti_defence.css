@@ -4,21 +4,21 @@
     background-color: #193f90 !important; /* --c-blue-dark */
 }
 
-/* The VF framework's hero content box defaults to max-content width
-   *and* sits flush left — on a wide hero that reads as a white card
-   stuck in one corner. Keep the white card (just center it) instead
-   of pinning it to the left edge. */
+/* No white card: heading sits directly on the blue bar, full-width,
+   matching frontend/index.html's .title-band. */
 .vf-hero__content {
-    margin: 0 auto !important;
+    background: transparent !important;
+    max-width: none !important;
+    width: 100% !important;
 }
-/* The framework also pins the heading itself to a fixed max-width
-   (a responsive breakpoint value meant for a narrower page), which
-   wraps the title to two lines and, since the card above shrinks to
-   fit its content, keeps the white card narrow too. Let it size to
-   its natural one-line width instead. */
 .vf-hero__heading {
     max-width: none !important;
     white-space: nowrap !important;
+    color: #fff !important;
+}
+.vf-hero__kicker,
+.vf-hero__text {
+    color: #fff !important;
 }
 
 /* Match the main site's ~88vw/1600px content width instead of the
