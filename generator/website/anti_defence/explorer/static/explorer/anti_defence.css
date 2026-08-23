@@ -31,6 +31,13 @@
     color: #fff !important;
 }
 
+/* Section-card accent border defaults to the framework's green —
+   override to --c-blue (the same accent used for h2's left border
+   on the main site). */
+.vf-card--brand.vf-card--bordered {
+    border-bottom-color: #3b6fb6 !important;
+}
+
 /* Match the main site's ~88vw/1600px content width instead of the
    EBI Visual Framework's fixed 1280px body cap (frontend/index.html
    .page/#results use the same width/max-width pair). */
