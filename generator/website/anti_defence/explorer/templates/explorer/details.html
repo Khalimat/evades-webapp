@@ -1,0 +1,323 @@
+<!-- explorer/templates/explorer/details.html -->
+
+{% extends "explorer/base.html" %}
+{% load static %}
+{% load custom_filters %}
+{% block content %}
+<script src="https://unpkg.com/@popperjs/core@2"></script>
+<script src="https://unpkg.com/tippy.js@6"></script>
+<link rel="stylesheet" href="https://unpkg.com/tippy.js@6/dist/tippy.css">
+<script src="{% static 'explorer/js/anti_defence.js' %}"></script>
+<script type="importmap">
+    {
+        "imports": {
+            "@nightingale-elements/": "https://cdn.jsdelivr.net/npm/@nightingale-elements/"
+        }
+    }
+    </script>
+    <script src="{% static 'explorer/js/nightingale_track.js' %}" type="module"></script>
+    {{ pfam_annotations|json_script:"pfam-annotations-data" }}
+
+<section class="vf-content | vf-stack vf-stack--600">
+    <h2> Protein: {{ name }} </h2>
+    <article class="vf-card vf-card--brand vf-card--bordered">
+        <div class="vf-card__content | vf-stack vf-stack--600">
+            <h3 class="vf-card__heading">Overview</h3>
+            <table class="vf-table | vf-u-width__100">
+                <tbody class="vf-table__body">
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            Mode of Action (MoA)
+                        </td>
+                        <td class="vf-table__cell">
+                            {{ moa|urlize }}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            Evidence
+                        </td>
+                        <td class="vf-table__cell">
+                            {{ evidence|eco_tooltip }}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            MoA Category
+                        </td>
+                        <td class="vf-table__cell">
+                            {{ moa_category }}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <span class="tooltip">
+                                <i class="fas fa-question-circle tooltip-icon"></i>
+                                <span class="tooltiptext">
+                                    Subtype(s) of the defence system(s) inhibited by the protein
+                                </span>
+                            </span>
+                            Defence Subtype
+                        </td>
+                        <td class="vf-table__cell">
+                            {{ defence_subtype }}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <span class="tooltip">
+                                <i class="fas fa-question-circle tooltip-icon"></i>
+                                <span class="tooltiptext">
+                                    Relevant publication(s)
+                                </span>
+                            </span>
+                            DOI
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if doi %}
+                                {% for entry in doi|split_all:";" %}
+                                    <a href="https://doi.org/{{ entry }}" target="_blank">{{ entry }}</a>{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <span class="tooltip">
+                                <i class="fas fa-question-circle tooltip-icon"></i>
+                                <span class="tooltiptext">
+                                    Other components of the anti-defence system
+                                </span>
+                            </span>
+                            Multicomponent System
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if multicomponent %}
+                                {% for prot_id in multicomponent|split_all:";" %}
+                                    <a href="{% url 'details' prot_id %}" target="_blank" class="vf-link">{{ prot_id }}</a>{% if not forloop.last %}; {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <span class="tooltip">
+                                <i class="fas fa-question-circle tooltip-icon"></i>
+                                <span class="tooltiptext">
+                                    Known structure in PDB
+                                </span>
+                            </span>
+                            PDB ID
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if pdb %}
+                                <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/{{ pdb|split:"_" }}" target="_blank"> {{ pdb }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <span class="tooltip">
+                                <i class="fas fa-question-circle tooltip-icon"></i>
+                                <span class="tooltiptext">
+                                    Genome(s) encoding the protein
+                                </span>
+                            </span>
+                            Protein Source
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if protein_source_name %}
+                                {% if protein_source_link %}
+                                    <a href="{{ protein_source_link }}" target="_blank">{{ protein_source_name }}</a>
+                                {% else %}
+                                    {{ protein_source_name }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <span class="tooltip">
+                                <i class="fas fa-question-circle tooltip-icon"></i>
+                                <span class="tooltiptext">
+                                    Defence system(s) inhibited by the protein
+                                </span>
+                            </span>
+                            Defences
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if defences %}
+                                {% for defence in defences %}
+                                    {% if defence.link %}
+                                        <a href="{{ defence.link }}" target="_blank">{{ defence.name }}</a>{% if not forloop.last %}, {% endif %}
+                                    {% else %}
+                                        {{ defence.name }}{% if not forloop.last %}, {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if euk_virus_homologs_blob %}
+                    <tr class="vf-table__row">
+                        <td class="vf-table__cell">
+                            <a href="{% url 'serve_euk_virus_homologs' pk=id %}" target="_blank" class="vf-button vf-button--secondary vf-button--sm">View homologs from eukaryotic dsDNA viruses</a>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="vf-card vf-card--brand vf-card--bordered">
+        <div class=" vf-card__content">
+            <h3>3D structure</h3>
+            <div id="pdb_viewer">
+                {% if "_" in pdb|force_string %}
+                    {% with mol_id=pdb|first_part_lower %}
+                        <pdbe-molstar
+                            molecule-id="{{ mol_id }}"
+                            alphafold-view="true"
+                            bg-color-r="255"
+                            bg-color-g="255"
+                            bg-color-b="255"
+                            sequence-panel="true"
+                            landscape="false"
+                        >
+                        </pdbe-molstar>
+                    {% endwith %}
+                {% else %}
+                    <pdbe-molstar
+                        custom-data-url="{% url 'serve_blob_as_file' pk=id column_name='pdb_blob' %}"
+                        custom-data-format="{% if is_cif %}cif{% else %}pdb{% endif %}"
+                        alphafold-view="true"
+                        bg-color-r="255"
+                        bg-color-g="255"
+                        bg-color-b="255"
+                        sequence-panel="true"
+                        landscape="false"
+                    >
+                    </pdbe-molstar>
+                {% endif %}
+            </div>
+            <div>
+                <p>
+                    {{ structure_type }} model.
+                </p>
+            </div>
+            {% if pdb %}
+            <div>
+                <p>
+                    A similar PDB structure exists: <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/{{ pdb|split:"_" }}" target="_blank" class="vf-link ext">{{ pdb }}</a>
+                </p>
+            </div>
+            {% endif %}
+            <div>
+                <p>
+                    <a href="{% url 'serve_blob_as_file' pk=id column_name='pdb_blob' %}" 
+                        download="{{ name }}.{% if is_cif %}cif{% else %}pdb{% endif %}" 
+                        class="vf-button vf-button--secondary vf-button--sm">
+                        Download structure file
+                    </a>
+                </p>
+            </div>
+        </div>
+    </article>
+    <article class="vf-card vf-card--brand vf-card--bordered">
+        <div class="vf-card__content | vf-stack vf-stack--400">
+            <h3 class="vf-card__heading">Feature viewer - predicted secondary structure</h3>
+            <div id="feature-data" data-url="{% url 'serve_blob_as_file' pk=id column_name='pred_secondary_structure_blob' %}"></div>
+            <div id="featuresContainer"></div>
+            <a href="{% url 'serve_blob_as_file' pk=id column_name='pred_secondary_structure_blob' %}" download="{{ name }}_features.json" class="vf-button vf-button--secondary vf-button--sm">Download features JSON file</a>
+        </div>
+    </article>
+    <article class="vf-card vf-card--brand vf-card--bordered">
+        <div class="vf-card__content | vf-stack vf-stack--400">
+            <h3 class="vf-card__heading">Pfam annotations</h3>
+            {% if pfam_annotations %}
+                <table id="pfams-table" class="vf-table pfams-table .vf-u-margin__bottom--400">
+                    <thead class="vf-table__header">
+                        <tr class="vf-table__row">
+                            <th class="vf-table__heading" scope="col">Pfam Name</th>
+                            <th class="vf-table__heading" scope="col">Pfam Acc</th>
+                            <th class="vf-table__heading" scope="col">Pfam Length</th>
+                            <th class="vf-table__heading" scope="col">Colour</th>
+                            <th class="vf-table__heading" scope="col">HMM Start</th>
+                            <th class="vf-table__heading" scope="col">HMM End</th>
+                            <th class="vf-table__heading" scope="col">Ali Start</th>
+                            <th class="vf-table__heading" scope="col">Ali End</th>
+                            <th class="vf-table__heading" scope="col">Env Start</th>
+                            <th class="vf-table__heading" scope="col">Env End</th>
+                            <th class="vf-table__heading" scope="col">Evalue</th>
+                        </tr>
+                    </thead>
+                    <tbody class="vf-table__body">
+                        {% for pfam in pfam_annotations %}
+                        <tr class="vf-table__row pfam-item" data-proteinpfam="{{ pfam.accession }}">
+                            <td class="vf-table__cell">{{ pfam.name }}</td>
+                            <td class="vf-table__cell">
+                                <a href="https://www.ebi.ac.uk/interpro/entry/pfam/{{ pfam.accession }}" target="_blank">{{ pfam.accession }}</a>
+                            </td>
+                            <td class="vf-table__cell">{{ pfam.length }}</td>
+                            <td class="vf-table__cell"></td>
+                            <td class="vf-table__cell">{{ pfam.hmm_start }}</td>
+                            <td class="vf-table__cell">{{ pfam.hmm_end }}</td>
+                            <td class="vf-table__cell">{{ pfam.ali_start }}</td>
+                            <td class="vf-table__cell">{{ pfam.ali_end }}</td>
+                            <td class="vf-table__cell">{{ pfam.env_start }}</td>
+                            <td class="vf-table__cell">{{ pfam.env_end }}</td>
+                            <td class="vf-table__cell">{{ pfam.evalue|floatformat:"-g" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <nightingale-manager id="nightingale_manager">
+                    <nightingale-navigation id="nightingale_navigation" height="40" length="{{ sequence|length }}"
+                        margin-color="white" highlight-color="#FF000066" show-highlight>
+                    </nightingale-navigation>
+                    <nightingale-sequence sequence="{{ sequence }}" id="nightingale_sequence" height="40"
+                        length="{{ sequence|length }}" display-start="1" display-end="50"
+                        highlight-color="#FF000066">
+                    </nightingale-sequence>
+                    <nightingale-track id="nightingale_track" height="200" length="{{ sequence|length }}"
+                        display-start="1" display-end="50" layout="non-overlapping" highlight-color="#FF000066">
+                    </nightingale-track>
+                </nightingale-manager>
+            {% else %}
+                <tr class="vf-table__heading">
+                    <td class="vf-table__cell" colspan="10">No Pfam domains found</td>
+                </tr>
+            {% endif %}
+        </div>
+    </article>
+    <article class="vf-card vf-card--brand vf-card--bordered">
+        <div class="vf-card__content | vf-stack vf-stack--400 | sequenceViewerDiv">
+            <h3 class="vf-card__heading">Sequence Viewer</h3>
+            <p id="positionMessage">Amino acid position: -</p>
+            <div id="proteinSequenceContainer" class="protein-sequence-container">
+                {{ sequence }}
+            </div>
+            <div class="right-align">
+                <button id="copy_button" class="vf-button vf-button--secondary vf-button--sm">Copy</button>
+            </div>
+        </div>
+    </article>
+</section>
+
+{% comment %} PDB viewer {% endcomment %}
+<script src="https://cdn.jsdelivr.net/npm/babel-polyfill/dist/polyfill.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@webcomponents/webcomponentsjs/webcomponents-lite.js" charset="utf-8"></script>
+<script src="https://cdn.jsdelivr.net/npm/@webcomponents/webcomponentsjs/custom-elements-es5-adapter.js" charset="utf-8"></script>
+<script type="text/javascript" src="https://www.ebi.ac.uk/pdbe/pdb-component-library/js/pdbe-molstar-component-3.1.0.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/calipho-sib/feature-viewer@v1.1.0/dist/feature-viewer.bundle.js"></script>
+
+{% endblock %}

@@ -28,6 +28,27 @@ data/downloads/*
 data/uploads/*
 !data/uploads/.gitkeep
 
+# Explore tab — statically rendered by generator/export_static.py.
+# Same story as data/*: a generated artifact, not source. Regenerate
+# per generator/README.md rather than committing it.
+frontend/explore/*
+!frontend/explore/.gitkeep
+
 # Editors
 .vscode/
 .idea/
+
+# Explorer static-site generator (one-time/occasional use, not part of
+# the deployed app) — see generator/README.md. Heavy inputs and local
+# tooling live here but never get committed.
+generator/assets/
+generator/tools/
+generator/.venv/
+generator/work/
+generator/results/
+generator/*.sqlite3
+generator/website/anti_defence/*.sqlite3
+generator/website/anti_defence/staticfiles/
+generator/website/requirements.txt.original
+.nextflow*
+anti_defence-main.zip

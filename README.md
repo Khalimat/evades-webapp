@@ -1,10 +1,11 @@
 # EVADES web app
 
-Self-hosted companion site for the EVADES database: bulk downloads +
-an "Analyse" tab (HMM search via HMMER, structure search via
-Foldseek). No dependency on EBI infrastructure — runs entirely in
-Docker Compose, portable to any VM (Hetzner, DigitalOcean, or later
-EMBL-EBI's Embassy Cloud).
+Self-hosted companion site for the EVADES database: bulk downloads,
+an "Explore" tab (the protein browser, statically generated — see
+`generator/README.md`), and an "Analyse" tab (HMM search via HMMER,
+structure search via Foldseek). No dependency on EBI infrastructure —
+runs entirely in Docker Compose, portable to any VM (Hetzner,
+DigitalOcean, or later EMBL-EBI's Embassy Cloud).
 
 ## Architecture
 
@@ -14,6 +15,7 @@ EMBL-EBI's Embassy Cloud).
   nginx  (reverse proxy, port 8080)
     |
     +--> static frontend (HTML/JS)
+    +--> /explore/* --> statically-rendered protein browser (frontend/explore/)
     +--> /api/*  --> api (FastAPI)
     |                  |
     |               enqueues job

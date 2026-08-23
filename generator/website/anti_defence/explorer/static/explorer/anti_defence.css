@@ -1,0 +1,145 @@
+/* Navigation bar */
+.vf-navigation__link {
+    padding: 0.5rem 1rem;
+    transition: background-color 0.3s, color 0.3s;
+    text-decoration: none;
+    color: #333;
+}
+
+.vf-navigation__link:hover {
+    background-color: #f0f0f0;
+}
+
+.vf-navigation__link.is-active {
+    background-color: #005ea5; /* EMBlue */
+    color: white !important;   /* Contrast text */
+    font-weight: 600;
+}
+
+/* Tables */
+td {
+    word-wrap: break-word;
+    max-width: 100px;
+}
+
+.proteins-table-container {
+    overflow-x: auto; /* Add horizontal scrolling */
+    max-width: 100%; /* Keep the table within the article */
+}
+
+/* Tooltip */
+.tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+}
+
+.tooltip .tooltiptext {
+    visibility: hidden;
+    width: 400px;
+    background-color: #555;
+    color: #fff;
+    font-size: 16px;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px;
+    position: absolute;
+    z-index: 2000;
+    bottom: 100%; /* Position above the tooltip icon */
+    left: 50%;
+    margin-left: -100px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.tooltip .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%; /* Arrow pointing down */
+    left: 25%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #555 transparent transparent transparent;
+}
+
+.tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+.tooltip-icon {
+    margin-left: 5px;
+    font-size: 16px;
+}
+
+/* Nightingale */
+nightingale-manager {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* PDB viewer */
+#pdb_viewer {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    margin-bottom: 10px;
+    z-index: 1985;
+}
+
+/* Sequence viewer */
+.protein-sequence-container {
+    word-wrap: break-word;
+    overflow-y: scroll;
+    height: 20em;
+    padding: 10px;
+    background-color: #e1fae8;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-family: Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    letter-spacing: 2px;
+}
+
+.highlight {
+    background-color: #fcf5a7;
+    font-weight: bold;
+}
+
+.sequenceViewerDiv {
+    overflow: auto;
+}
+
+/* Proteins Datatable */
+.letter-btn {
+    padding: 5px 10px;
+    margin: 2px;
+    border: 1px solid #ccc;
+    background-color: white;
+    cursor: pointer;
+}
+
+.letter-btn.active {
+    background-color: #007bff; /* Blue highlight */
+    color: white;
+    font-weight: bold;
+}
+
+.eco {
+    text-decoration: underline dotted;
+    cursor: help;
+    color: inherit;
+}
+
+.eco-more {
+    margin-top: 6px;
+    display: inline-block;
+    background: gray;
+    border: 1px solid white;
+    padding: 3px;
+    cursor: pointer;
+    font: inherit;
+    color: white;
+}

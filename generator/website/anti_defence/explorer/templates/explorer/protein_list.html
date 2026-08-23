@@ -1,0 +1,107 @@
+{% extends "explorer/base.html" %}
+{% load static %}
+{% load custom_filters %}
+{% block content %}
+<script src="{% static 'explorer/js/all_proteins.js' %}"></script>
+
+<section class="vf-content | vf-stack vf-stack--600">
+    <h2>Available Proteins</h2>
+    <article class="vf-card vf-card--brand vf-card--bordered vf-stack--600">
+        <div id="letter-filter">
+            <button class="letter-btn" data-letter="all">All</button>
+            <button class="letter-btn" data-letter="0-9">0-9</button>
+            <button class="letter-btn" data-letter="A">A</button>
+            <button class="letter-btn" data-letter="B">B</button>
+            <button class="letter-btn" data-letter="C">C</button>
+            <button class="letter-btn" data-letter="D">D</button>
+            <button class="letter-btn" data-letter="E">E</button>
+            <button class="letter-btn" data-letter="F">F</button>
+            <button class="letter-btn" data-letter="G">G</button>
+            <button class="letter-btn" data-letter="H">H</button>
+            <button class="letter-btn" data-letter="I">I</button>
+            <button class="letter-btn" data-letter="J">J</button>
+            <button class="letter-btn" data-letter="K">K</button>
+            <button class="letter-btn" data-letter="L">L</button>
+            <button class="letter-btn" data-letter="M">M</button>
+            <button class="letter-btn" data-letter="N">N</button>
+            <button class="letter-btn" data-letter="O">O</button>
+            <button class="letter-btn" data-letter="P">P</button>
+            <button class="letter-btn" data-letter="Q">Q</button>
+            <button class="letter-btn" data-letter="R">R</button>
+            <button class="letter-btn" data-letter="S">S</button>
+            <button class="letter-btn" data-letter="T">T</button>
+            <button class="letter-btn" data-letter="U">U</button>
+            <button class="letter-btn" data-letter="V">V</button>
+            <button class="letter-btn" data-letter="W">W</button>
+            <button class="letter-btn" data-letter="X">X</button>
+            <button class="letter-btn" data-letter="Y">Y</button>
+            <button class="letter-btn" data-letter="Z">Z</button>
+        </div>
+        <div class="vf-card__content proteins-table-container | vf-stack vf-stack--600">
+            <table id="proteins-table" class="vf-table proteins-table .vf-u-margin__bottom--600">
+                <thead class="vf-table__header">
+                    <tr class="vf-table__row">
+                        <th class="vf-table__heading" scope="col">Protein Name</th>
+                        <th class="vf-table__heading" scope="col">Mode of Action (MoA)</th>
+                        <th class="vf-table__heading" scope="col">MoA Category</th>
+                        <th class="vf-table__heading" scope="col">Defence Subtype</th>
+                        <th class="vf-table__heading" scope="col">Multicomponent System</th>
+                        <th class="vf-table__heading" scope="col">PDB ID</th>
+                        <th class="vf-table__heading" scope="col">Protein Source</th>
+                    </tr>
+                </thead>
+                <tbody class="vf-table__body">
+                    {% for protein in proteins %}
+                    <tr class="vf-table__row protein-item">
+                        <td class="vf-table__cell">
+                            <a href="{% url 'details' protein.id %}">{{ protein.name }}</a>
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if protein.moa %}
+                                {{ protein.moa }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="vf-table__cell">{{ protein.moa_category }}</td>
+                        <td class="vf-table__cell">
+                            {% if protein.defence_subtype %}
+                                {{ protein.defence_subtype }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if protein.multicomponent %}
+                                {{ protein.multicomponent }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if protein.pdb %}
+                                <a href="https://www.ebi.ac.uk/pdbe/entry/pdb/{{ protein.pdb|split:"_" }}" target="_blank"> {{ protein.pdb }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="vf-table__cell">
+                            {% if protein.protein_source_name %}
+                                {% if protein.protein_source_link %}
+                                <a href="{{ protein.protein_source_link }}" target="_blank">{{ protein.protein_source_name }}</a>
+                                {% else %}
+                                    {{ protein.protein_source_name }}
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+
+{% endblock content %}
