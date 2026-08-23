@@ -4,6 +4,22 @@
     background-color: #193f90 !important; /* --c-blue-dark */
 }
 
+/* The VF framework's hero content box defaults to max-content width,
+   which hugs its text and sits flush left — on a wide hero that reads
+   as a small white card stuck in one corner with a lot of empty blue
+   next to it. Drop the card and put the heading directly on the blue
+   bar, full-width, matching frontend/index.html's .title-band. */
+.vf-hero__content {
+    background: transparent !important;
+    max-width: none !important;
+    width: 100% !important;
+}
+.vf-hero__heading,
+.vf-hero__kicker,
+.vf-hero__text {
+    color: #fff !important;
+}
+
 /* Match the main site's ~88vw/1600px content width instead of the
    EBI Visual Framework's fixed 1280px body cap (frontend/index.html
    .page/#results use the same width/max-width pair). */

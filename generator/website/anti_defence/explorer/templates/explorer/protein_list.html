@@ -43,9 +43,9 @@
                     <tr class="vf-table__row">
                         <th class="vf-table__heading" scope="col">Protein Name</th>
                         <th class="vf-table__heading" scope="col">Mode of Action (MoA)</th>
-                        <th class="vf-table__heading" scope="col">MoA Category</th>
+                        <th class="vf-table__heading" scope="col">Pfam ID</th>
                         <th class="vf-table__heading" scope="col">Defence Subtype</th>
-                        <th class="vf-table__heading" scope="col">Multicomponent System</th>
+                        <th class="vf-table__heading" scope="col">DOI</th>
                         <th class="vf-table__heading" scope="col">PDB ID</th>
                         <th class="vf-table__heading" scope="col">Protein Source</th>
                     </tr>
@@ -63,7 +63,15 @@
                                 -
                             {% endif %}
                         </td>
-                        <td class="vf-table__cell">{{ protein.moa_category }}</td>
+                        <td class="vf-table__cell">
+                            {% if protein.existing_pfams %}
+                                {% for pfam_id in protein.existing_pfams|split_all:";" %}
+                                    <a href="https://www.ebi.ac.uk/interpro/entry/pfam/{{ pfam_id }}" target="_blank">{{ pfam_id }}</a>{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
                         <td class="vf-table__cell">
                             {% if protein.defence_subtype %}
                                 {{ protein.defence_subtype }}
@@ -72,8 +80,10 @@
                             {% endif %}
                         </td>
                         <td class="vf-table__cell">
-                            {% if protein.multicomponent %}
-                                {{ protein.multicomponent }}
+                            {% if protein.doi %}
+                                {% for entry in protein.doi|split_all:";" %}
+                                    <a href="https://doi.org/{{ entry }}" target="_blank">{{ entry }}</a>{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
                             {% else %}
                                 -
                             {% endif %}
