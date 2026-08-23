@@ -1,3 +1,25 @@
+/* Same black masthead bar as frontend/index.html's .masthead, instead
+   of the EBI Visual Framework's own top nav (EMBL-EBI home / Services
+   / Research / Training / About us) that base/header.html used to
+   pull in. */
+.masthead {
+    background: #1a1c1a; /* --c-black */
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+.masthead-inner {
+    width: 88vw;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-sizing: border-box;
+}
+
 /* Match the main site's blue palette (frontend/index.html --c-blue*)
    instead of the EBI Visual Framework's default green hero. */
 .vf-hero.vf-hero--400 {

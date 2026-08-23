@@ -51,7 +51,11 @@
     {% endblock head %}
 </head>
 <body class="vf-body | vf-stack vf-stack--200">
-    {% include "base/header.html" %}
+    <div class="masthead">
+        <div class="masthead-inner">
+            <span>Bacterial virus anti-defence systems &middot; sequence &amp; structure resource</span>
+        </div>
+    </div>
     <section style="--vf-hero--bg-image: url('{{ base_url }}{% static "explorer/banner.jpg" %}'); margin-top: 0" class="vf-hero vf-hero--400 | vf-u-fullbleed">
         <div class="vf-hero__content | vf-box | vf-stack vf-stack--400">
             {% if request.resolver_match.url_name in "home" %}<p class="vf-hero__kicker">Encyclopaedia of Bacterial Virus Anti-Defence Systems</p>{% endif %}
