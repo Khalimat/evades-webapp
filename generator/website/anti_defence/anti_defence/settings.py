@@ -23,6 +23,12 @@ env = environ.Env(
     DJANGO_SECRET_KEY=(str, "django-insecure-dummy-key"),
     ALLOWED_HOST=(str, "localhost"),
     BASE_URL=(str, "http://localhost:8000"),
+    # Root-relative path to the parent app this one is mounted under
+    # (e.g. "/" for a self-hosted deployment, "/finn-srv/evades/" if
+    # nested under an EBI-style path prefix later) — used for the
+    # "back to main site" link, kept scheme/host-agnostic so the
+    # generated static HTML works under any domain.
+    SITE_ROOT=(str, "/"),
 )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -43,6 +49,8 @@ DEBUG = env("DEBUG")
 ALLOWED_HOSTS = [env("ALLOWED_HOST"), "127.0.0.1"]
 
 STATIC_URL = "static/"
+
+SITE_ROOT = env("SITE_ROOT")
 
 BASE_URL = env("BASE_URL")
 if BASE_URL:

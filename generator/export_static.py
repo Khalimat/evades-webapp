@@ -19,13 +19,20 @@ GENERATOR_DIR = Path(__file__).resolve().parent
 WEBSITE_DIR = GENERATOR_DIR / "website" / "anti_defence"
 REPO_ROOT = GENERATOR_DIR.parent
 OUT_DIR = REPO_ROOT / "frontend" / "explore"
+# Where this app is mounted, e.g. "/explore/" self-hosted, or
+# "/finn-srv/evades/explore/" nested under an EBI-style path prefix
+# later — change only this one value to move it. Must end in
+# "explore/"; SITE_ROOT (the parent app's root, used for the "back to
+# main site" link) is derived from it below.
 SCRIPT_PREFIX = "/explore/"
+SITE_ROOT = SCRIPT_PREFIX.removesuffix("explore/")
 
 os.environ["DATABASE_URL"] = f"sqlite:///{WEBSITE_DIR / 'anti_defence.sqlite3'}"
 os.environ["DEBUG"] = "False"
 os.environ["DJANGO_SECRET_KEY"] = "static-export-only"
 os.environ["ALLOWED_HOST"] = "localhost"
-os.environ["BASE_URL"] = "http://localhost/explore"
+os.environ["BASE_URL"] = f"http://localhost{SCRIPT_PREFIX.rstrip('/')}"
+os.environ["SITE_ROOT"] = SITE_ROOT
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "anti_defence.settings")
 
 sys.path.insert(0, str(WEBSITE_DIR))

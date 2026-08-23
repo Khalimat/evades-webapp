@@ -1,4 +1,6 @@
-const API_BASE = "/api";
+// Relative (no leading slash) so it resolves against <base href> in
+// index.html rather than the domain root — see the comment there.
+const API_BASE = "api";
 
 // --- tabs ---
 document.querySelectorAll(".tab-btn").forEach(btn => {
@@ -47,7 +49,7 @@ function escapeHtml(str) {
 function renderCell(col, value) {
   if (col === "adp" && value) {
     const safeId = encodeURIComponent(value);
-    return `<a href="/explore/details/${safeId}/" target="_blank" rel="noopener noreferrer">${escapeHtml(value)}</a>`;
+    return `<a href="explore/details/${safeId}/" target="_blank" rel="noopener noreferrer">${escapeHtml(value)}</a>`;
   }
   return escapeHtml(value);
 }

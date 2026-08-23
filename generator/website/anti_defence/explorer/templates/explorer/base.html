@@ -56,7 +56,7 @@
             <span>Bacterial virus anti-defence systems &middot; sequence &amp; structure resource</span>
         </div>
     </div>
-    <section style="--vf-hero--bg-image: url('{{ base_url }}{% static "explorer/banner.jpg" %}'); margin-top: 0" class="vf-hero vf-hero--400 | vf-u-fullbleed">
+    <section style="--vf-hero--bg-image: url('{% static "explorer/banner.jpg" %}'); margin-top: 0" class="vf-hero vf-hero--400 | vf-u-fullbleed">
         <div class="vf-hero__content | vf-box | vf-stack vf-stack--400">
             {% if request.resolver_match.url_name in "home" %}<p class="vf-hero__kicker">Encyclopaedia of Bacterial Virus Anti-Defence Systems</p>{% endif %}
             <h1 class="vf-hero__heading">Encyclopaedia of Bacterial Virus Anti-Defence Systems</h1>
@@ -65,7 +65,7 @@
     <nav class="vf-navigation vf-navigation--main | vf-cluster">
         <ul class="vf-navigation__list | vf-list | vf-cluster__inner">
             <li class="vf-navigation__item">
-            <a href="/" class="vf-navigation__link">&larr; Home (Download / Analyse)</a>
+            <a href="{{ site_root }}" class="vf-navigation__link">&larr; Home (Download / Analyse)</a>
         </li>
         <li class="vf-navigation__item">
             <a href="{% url 'protein_list' %}"
