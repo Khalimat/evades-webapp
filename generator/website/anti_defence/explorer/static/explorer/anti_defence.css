@@ -4,6 +4,14 @@
     background-color: #193f90 !important; /* --c-blue-dark */
 }
 
+/* Match the main site's ~88vw/1600px content width instead of the
+   EBI Visual Framework's fixed 1280px body cap (frontend/index.html
+   .page/#results use the same width/max-width pair). */
+body.vf-body {
+    width: 88vw !important;
+    max-width: 1600px !important;
+}
+
 /* Navigation bar */
 .vf-navigation__link {
     padding: 0.5rem 1rem;

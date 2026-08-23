@@ -114,6 +114,12 @@
   }
   a.tab-btn { text-decoration: none; display: inline-block; }
 
+  .tabs-hint {
+    margin: 10px 0 0;
+    font-size: 14px;
+    color: var(--c-muted);
+  }
+
   .panel { display: none; padding-top: 28px; }
   .panel.active { display: block; }
 
@@ -256,8 +262,9 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="download">Download</button>
       <button class="tab-btn" data-tab="analyse">Analyse</button>
-      <a class="tab-btn" href="/explore/protein_list/">Explore</a>
+      <a class="tab-btn" href="/explore/protein_list/" title="Check the list of experimentally validated anti-defence proteins">Explore</a>
     </div>
+    <p class="tabs-hint">Explore: check the list of experimentally validated anti-defence proteins.</p>
 
     <div id="download" class="panel active">
       <h2>Bulk downloads</h2>
