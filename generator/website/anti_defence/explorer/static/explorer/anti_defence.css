@@ -11,6 +11,15 @@
 .vf-hero__content {
     margin: 0 auto !important;
 }
+/* The framework also pins the heading itself to a fixed max-width
+   (a responsive breakpoint value meant for a narrower page), which
+   wraps the title to two lines and, since the card above shrinks to
+   fit its content, keeps the white card narrow too. Let it size to
+   its natural one-line width instead. */
+.vf-hero__heading {
+    max-width: none !important;
+    white-space: nowrap !important;
+}
 
 /* Match the main site's ~88vw/1600px content width instead of the
    EBI Visual Framework's fixed 1280px body cap (frontend/index.html
