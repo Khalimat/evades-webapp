@@ -5,16 +5,26 @@
 }
 
 /* No white card: heading sits directly on the blue bar, full-width,
-   matching frontend/index.html's .title-band. */
+   matching frontend/index.html's .title-band/.title-band h1 exactly
+   (same padding, font-size, weight — the framework's card styling
+   includes a drop-shadow that reads as a faint rectangle even with a
+   transparent background, so that has to go too). */
 .vf-hero__content {
     background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
     max-width: none !important;
     width: 100% !important;
+    padding: 28px 20px 22px !important;
 }
 .vf-hero__heading {
     max-width: none !important;
     white-space: nowrap !important;
     color: #fff !important;
+    font-size: 28px !important;
+    font-weight: 600 !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
 }
 .vf-hero__kicker,
 .vf-hero__text {
