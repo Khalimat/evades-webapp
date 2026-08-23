@@ -181,6 +181,16 @@
     font-weight: 600;
   }
   tbody tr:nth-child(even) { background: #fafafa; }
+  /* The results table's columns (esp. col-moa) can need more room
+     than the 1100px page — scope any overflow to this box instead of
+     letting it stretch/shift the whole centered .page layout. */
+  #results {
+    overflow-x: auto;
+  }
+  #results table {
+    width: auto;
+    min-width: 100%;
+  }
   #results td {
     max-width: 320px;
     overflow: hidden;
@@ -188,8 +198,8 @@
     white-space: nowrap;
   }
   #results .col-moa {
-    min-width: 320px;
-    max-width: 480px;
+    min-width: 240px;
+    max-width: 400px;
   }
   #results .col-defence {
     min-width: 160px;
