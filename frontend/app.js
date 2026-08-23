@@ -22,7 +22,7 @@ const COLUMN_LABELS = {
   query_name: "Query",
   query: "Query",
   adp: "ADP",
-  moa: "MoA",
+  moa: "Mechanism of Action",
   defence: "Inhibited Defence",
   evalue: "E-value",
   score: "Score",
@@ -67,7 +67,7 @@ function renderResults(job) {
   const cols = Object.keys(hits[0]);
   let html = "<table><thead><tr>" + cols.map(c => `<th class="col-${c}">${COLUMN_LABELS[c] || c}</th>`).join("") + "</tr></thead><tbody>";
   for (const hit of hits) {
-    html += "<tr>" + cols.map(c => `<td class="col-${c}">${renderCell(c, hit[c])}</td>`).join("") + "</tr>";
+    html += "<tr>" + cols.map(c => `<td class="col-${c}" title="${escapeHtml(hit[c])}">${renderCell(c, hit[c])}</td>`).join("") + "</tr>";
   }
   html += "</tbody></table>";
   el.innerHTML = html;

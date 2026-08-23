@@ -181,9 +181,19 @@
     font-weight: 600;
   }
   tbody tr:nth-child(even) { background: #fafafa; }
-  .col-moa {
+  #results td {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #results .col-moa {
     min-width: 320px;
     max-width: 480px;
+  }
+  #results .col-defence {
+    min-width: 160px;
+    max-width: 220px;
   }
 
   #status {
