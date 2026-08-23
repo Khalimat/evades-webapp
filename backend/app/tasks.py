@@ -8,6 +8,7 @@ directly — it only enqueues these by import string, so the API image
 itself never needs HMMER/Foldseek installed.
 """
 import csv
+import functools
 import os
 import re
 import subprocess
@@ -17,6 +18,27 @@ from pathlib import Path
 DATA_DIR = Path("/data")
 HMM_DB = DATA_DIR / "hmm" / "evades_profiles.hmm"          # `hmmpress`-ed HMM library
 FOLDSEEK_DB = DATA_DIR / "foldseek" / "evades_structures_db"  # `foldseek createdb` output
+METADATA_TSV = DATA_DIR / "downloads" / "metadata.tsv"      # curated EVADES protein metadata
+
+
+@functools.lru_cache(maxsize=1)
+def _load_metadata() -> dict[str, str]:
+    """protein ID -> semicolon-joined inhibited-defence name(s), from
+    the same metadata.tsv the bulk-download/Explore pages are built
+    from. Cheap enough (268 rows) to load fully and cache once."""
+    if not METADATA_TSV.exists():
+        return {}
+    with METADATA_TSV.open(newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        return {
+            row["ID"]: row.get("Defences", "")
+            for row in reader
+            if row.get("ID") and row.get("Defences") not in (None, "", "_")
+        }
+
+
+def _inhibited_defence(protein_id: str) -> str:
+    return _load_metadata().get(protein_id, "")
 
 # Some source PDBs (e.g. NMR structures) contained many models of the
 # same chain. foldseek createdb indexes each model as its own entry,
@@ -74,9 +96,14 @@ def _parse_domtblout(path: Path) -> list[dict]:
             fields = line.split()
             if len(fields) < 22:
                 continue
+            # HMM profiles are named "<protein id>.aln" after the
+            # alignment file they were built from — strip that back
+            # down to the plain ADP id for display/linking.
+            adp = re.sub(r"\.aln$", "", fields[3])
             hits.append({
                 "query_name": fields[0],
-                "hmm_profile": fields[3],
+                "adp": adp,
+                "defence": _inhibited_defence(adp),
                 "evalue": float(fields[6]),
                 "score": float(fields[7]),
                 "hmm_from": int(fields[15]),
@@ -142,7 +169,7 @@ def run_foldseek(pdb_path: str) -> dict:
                         continue
                     hits.append({
                         "query": row[0],
-                        "target_structure": row[1],
+                        "adp": row[1],
                         "seq_identity": float(row[2]),
                         "aln_len": int(row[3]),
                         "prob": float(row[4]),
@@ -168,12 +195,28 @@ def run_foldseek(pdb_path: str) -> dict:
         # protein, keeping only the highest-confidence (prob) model.
         best_by_protein: dict[str, dict] = {}
         for hit in hits:
-            base_name = _base_protein_name(hit["target_structure"])
-            hit["target_structure"] = base_name
+            base_name = _base_protein_name(hit["adp"])
+            hit["adp"] = base_name
             existing = best_by_protein.get(base_name)
             if existing is None or hit["prob"] > existing["prob"]:
                 best_by_protein[base_name] = hit
 
         hits = sorted(best_by_protein.values(), key=lambda h: -h["prob"])
+        for hit in hits:
+            hit["defence"] = _inhibited_defence(hit["adp"])
+        # Reorder so "defence" sits right after "adp" (dict field order
+        # drives the frontend table's column order).
+        hits = [
+            {
+                "query": h["query"],
+                "adp": h["adp"],
+                "defence": h["defence"],
+                "seq_identity": h["seq_identity"],
+                "aln_len": h["aln_len"],
+                "prob": h["prob"],
+                "tm_score": h["tm_score"],
+            }
+            for h in hits
+        ]
 
     return {"tool": "foldseek", "hits": hits, "n_hits": len(hits)}

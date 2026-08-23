@@ -16,6 +16,41 @@ function setStatus(msg) {
 
 let lastResult = null;
 
+// Raw JSON key -> display label for the results table. Keys not
+// listed here just show as-is.
+const COLUMN_LABELS = {
+  query_name: "Query",
+  query: "Query",
+  adp: "ADP",
+  defence: "Inhibited Defence",
+  evalue: "E-value",
+  score: "Score",
+  hmm_from: "HMM From",
+  hmm_to: "HMM To",
+  ali_from: "Ali From",
+  ali_to: "Ali To",
+  seq_identity: "Seq Identity",
+  aln_len: "Alignment Length",
+  prob: "Probability",
+  tm_score: "TM-score",
+};
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function renderCell(col, value) {
+  if (col === "adp" && value) {
+    const safeId = encodeURIComponent(value);
+    return `<a href="/explore/details/${safeId}/" target="_blank" rel="noopener noreferrer">${escapeHtml(value)}</a>`;
+  }
+  return escapeHtml(value);
+}
+
 function renderResults(job) {
   const el = document.getElementById("results");
   const downloadBtn = document.getElementById("downloadResultsBtn");
@@ -29,9 +64,9 @@ function renderResults(job) {
   }
   const hits = job.result.hits;
   const cols = Object.keys(hits[0]);
-  let html = "<table><thead><tr>" + cols.map(c => `<th>${c}</th>`).join("") + "</tr></thead><tbody>";
+  let html = "<table><thead><tr>" + cols.map(c => `<th>${COLUMN_LABELS[c] || c}</th>`).join("") + "</tr></thead><tbody>";
   for (const hit of hits) {
-    html += "<tr>" + cols.map(c => `<td>${hit[c]}</td>`).join("") + "</tr>";
+    html += "<tr>" + cols.map(c => `<td>${renderCell(c, hit[c])}</td>`).join("") + "</tr>";
   }
   html += "</tbody></table>";
   el.innerHTML = html;
@@ -53,7 +88,7 @@ function downloadResultsCsv() {
   };
 
   const lines = [
-    cols.join(","),
+    cols.map(c => escapeCell(COLUMN_LABELS[c] || c)).join(","),
     ...hits.map(hit => cols.map(c => escapeCell(hit[c])).join(","))
   ];
   const csvContent = lines.join("\n");
