@@ -32,9 +32,10 @@ DigitalOcean, or later EMBL-EBI's Embassy Cloud).
 ```
 
 The `api` container never runs HMMER/Foldseek itself — it only
-enqueues jobs. The `worker` container is the only place those tools
-run. This keeps the public-facing API image small and means you can
-scale workers independently later if load grows.
+enqueues jobs onto a Redis queue (via [RQ](https://python-rq.org/)).
+The `worker` container is the only place those tools run, and it's
+the piece you scale for concurrency — see "Handling concurrent
+requests" below.
 
 ## Quick start (local)
 
@@ -42,6 +43,38 @@ scale workers independently later if load grows.
 2. `cp .env.example .env` and adjust if needed (defaults work for local dev).
 3. `docker compose up --build`
 4. Visit `http://localhost:8080`
+
+## Handling concurrent requests
+
+The job queue (Redis + RQ) already decouples "someone hit Run search"
+from "an HMMER/Foldseek process is actually running" — the `api`
+container enqueues instantly regardless of load, so submissions never
+block or fail under concurrency, they just queue up. Whether they
+queue *and wait* or run *in parallel* depends only on how many
+`worker` containers are up:
+
+```bash
+docker compose up -d --scale worker=3
+```
+
+No code or compose-file changes needed for this — verified locally by
+submitting 3 searches at once with `--scale worker=3` and confirming
+via `docker compose logs worker` that all three were picked up by
+different worker containers at the same timestamp, not processed one
+after another.
+
+Each search job is capped at 2 threads (`hmmsearch --cpu 2`,
+`foldseek --threads 2`), so worker replicas don't fight each other for
+every core on the box. Size the VPS accordingly:
+
+**vCPUs needed ≈ 2 × the number of searches you want to run genuinely
+in parallel.** E.g. 4 vCPUs comfortably runs 2 worker replicas; 8
+vCPUs runs 4. Anything beyond that just queues (a few seconds' wait,
+not a failure) until a worker frees up.
+
+This is the same mechanism that carries over to EBI's Kubernetes
+later — `replicas: N` on the worker Deployment instead of `--scale`,
+nothing else changes.
 
 ## What to fill in before deploying for real
 
@@ -59,7 +92,9 @@ VM (Hetzner, DigitalOcean, EMBL-EBI's Embassy Cloud, ...).
 
 1. **Get a server.** A small VPS is plenty — HMMER/Foldseek searches
    are small per-request jobs, not the heavy one-time pipeline build
-   in `generator/`. 2GB RAM / 2 vCPU is comfortable.
+   in `generator/`. 2GB RAM / 2 vCPU covers low/no concurrent traffic
+   (1 worker replica); see "Handling concurrent requests" below for
+   sizing up if you expect multiple searches running at once.
 2. **Get a domain and point it at the server.** Buy one anywhere,
    then add an A record to the VM's IP. DNS propagation can take a
    few minutes to a few hours.

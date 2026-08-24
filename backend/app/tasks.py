@@ -157,6 +157,10 @@ def run_foldseek(pdb_path: str) -> dict:
         results_tsv = tmp_path / "results.tsv"
         cmd = [
             "foldseek", "easy-search",
+            "--threads", "2",  # capped like hmmsearch's --cpu 2 above — keeps
+                                # per-job resource use predictable so multiple
+                                # `worker` replicas can run concurrently on the
+                                # same host without fighting over all cores
             str(pdb_path),
             str(FOLDSEEK_DB),
             str(results_tsv),
