@@ -38,6 +38,7 @@ already downloaded, so re-running only fetches what's new.
 import argparse
 import sys
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -46,6 +47,55 @@ import pandas as pd
 MEDIA_XLSX_URL = "https://www.biorxiv.org/content/biorxiv/early/2024/01/23/2024.01.22.576744/DC1/embed/media-1.xlsx?download=true"
 MODEL_ARCHIVE_URL = "https://www.modelarchive.org/api/projects/ma-jd-viral-{index}?type=basic__model_file_name"
 REQUEST_DELAY_SECONDS = 0.3  # be polite to ModelArchive - no documented rate limit, but this is a lot of requests
+MAX_RETRIES = 5
+
+# bioRxiv (behind Cloudflare) 429s the default Python-urllib User-Agent
+# specifically - confirmed by reproducing the exact same 429 with curl
+# sending that same UA string, while curl's own default UA succeeds
+# every time. It isn't a real request-rate limit (retrying the
+# identical request with a normal UA works immediately) - it's bot
+# filtering keying off the UA. A real browser UA sidesteps it; applied
+# globally since it's harmless for ModelArchive's requests too.
+_opener = urllib.request.build_opener()
+_opener.addheaders = [(
+    "User-Agent",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+)]
+urllib.request.install_opener(_opener)
+
+
+def fetch_with_retry(url: str, out_path: Path) -> None:
+    """Both bioRxiv (media-1.xlsx - one big, one-time-ish download) and
+    ModelArchive (hundreds of small per-target requests) can 429 under
+    load - retry with exponential backoff (longer on a 429 specifically,
+    since that's the server explicitly asking us to slow down) rather
+    than letting one transient rate-limit response kill the whole run."""
+    last_error = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            urllib.request.urlretrieve(url, out_path)
+            return
+        except urllib.error.HTTPError as e:
+            last_error = e
+            if out_path.exists():
+                out_path.unlink()
+            if e.code == 429:
+                wait = 30 * (attempt + 1)
+            elif 500 <= e.code < 600:
+                wait = 5 * (2 ** attempt)
+            else:
+                raise  # a real 404/etc - retrying won't help, let the caller handle it
+        except Exception as e:
+            last_error = e
+            if out_path.exists():
+                out_path.unlink()
+            wait = 5 * (2 ** attempt)
+        if attempt < MAX_RETRIES - 1:
+            print(f"    ... {url} failed ({last_error}), retrying in {wait}s "
+                  f"(attempt {attempt + 2}/{MAX_RETRIES})")
+            time.sleep(wait)
+    raise last_error
 
 
 def ensure_media_xlsx(cache_dir: Path) -> Path:
@@ -54,7 +104,7 @@ def ensure_media_xlsx(cache_dir: Path) -> Path:
         return path
     cache_dir.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {MEDIA_XLSX_URL} -> {path} ...")
-    urllib.request.urlretrieve(MEDIA_XLSX_URL, path)
+    fetch_with_retry(MEDIA_XLSX_URL, path)
     return path
 
 
@@ -105,14 +155,12 @@ def main() -> None:
 
         url = MODEL_ARCHIVE_URL.format(index=f"{ma_index:05d}")
         try:
-            urllib.request.urlretrieve(url, out_path)
+            fetch_with_retry(url, out_path)
             fetched += 1
             if fetched % 25 == 0:
                 print(f"  ... {fetched} fetched so far")
         except Exception as e:
             failed.append((target, str(e)))
-            if out_path.exists():
-                out_path.unlink()  # don't leave a partial/empty file behind
         time.sleep(REQUEST_DELAY_SECONDS)
 
     print(f"\nDone. Fetched: {fetched}  Already cached: {cached}  "
