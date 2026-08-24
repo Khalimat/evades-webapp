@@ -8,44 +8,36 @@ import argparse
 # --format-mode 4`) renders its "Results" table with plain, static
 # markup and no sort/filter/search - its own bundled JS (a small
 # framework of its own, not jQuery) populates <tbody id="tableBody">
-# at load time.
+# at load time, and reuses ONE shared row (class="alignment foldseek",
+# no id) to show whichever result's alignment/3D-viewer is currently
+# toggled open - relocated and refilled via an unguarded
+# `document.querySelector(".alignment.foldseek").replaceChildren(...)`
+# in the click handler (confirmed live - no id, no null-check), and
+# apparently also located relative to whichever row is "currently
+# open" via DOM adjacency, not just the class selector (confirmed live
+# too: even just relocating - never deleting - that shared row out of
+# tbody so DataTables could init in-place made every OTHER row's
+# Toggle throw the same null error, unless the pre-expanded row was
+# toggled first). Their internal wiring is undocumented/minified and
+# clearly depends on fragile position assumptions we can't safely
+# replicate - so this patch never moves, removes, hides, or otherwise
+# touches a single node inside Foldseek's own table. That ruled out
+# both wrapping it in-place with DataTables (it owns and keeps
+# managing that DOM subtree - isDataTable() reports true, but no
+# .dataTables_wrapper ever appears) and stripping the offending
+# oversized row out of it (breaks Toggle page-wide, not just for that
+# row).
 #
-# Two earlier approaches both failed: wrapping that table in-place
-# with DataTables (isDataTable() reported true but no
-# .dataTables_wrapper was ever created - Foldseek's script keeps
-# managing that DOM subtree underneath it), and moving each <tr> out
-# into a fresh table (same silent failure, plus hiding the original
-# table via style.display didn't even apply). A clean, isolated
-# <table><td>text</td></table> with no Foldseek involvement DID work
-# (confirmed live), which narrows the problem to something about
-# Foldseek's actual row content - most likely the nested <button> with
-# an inline SVG icon in the "Toggle" cell - breaking DataTables when
-# that markup is inside the table it initializes.
-#
-# Working approach: don't touch Foldseek's table at all (no moving, no
-# hiding, zero risk of breaking its own alignment/3D-viewer toggle).
-# Instead, once the row data exists, read out plain TEXT from each
-# row into a brand new, independent table with no nested
-# buttons/SVGs/attributes (matching the isolated table that worked)
-# and let DataTables sort/filter/search *that*. Each row's Target cell
-# links to Foldseek's own named anchor for that row (`<a name="aln{N}">`,
-# injected into the row at render time - not in the static HTML source,
-# only appears live), so "view alignment" still works by jumping to the
-# untouched original row.
-#
-# The row-detection root cause (found by capturing the actual thrown
-# error instead of trusting the silent isDataTable()/no-wrapper
-# symptom): tbody isn't purely one <tr> per result. Foldseek
-# auto-expands the top hit's alignment on load by injecting an extra
-# sibling <tr> (2 <td>s: alignment text + TM-score) right after that
-# result's row. Treating it as a normal result row - wrong cell count
-# vs. the header - crashed DataTables deep inside its column-indexing
-# code (thrown as "Cannot set properties of undefined (setting
-# '_DT_CellIndex')"), which happened to abort silently before wrapper
-# creation. Fixed by keeping only <tr>s that carry that row's own
-# `<a name="aln...">` anchor (the detail row doesn't have one) -
-# reliable regardless of which/how many rows happen to be
-# pre-expanded.
+# What's left, and what's actually implemented below: read plain TEXT
+# out of each genuine result row (Foldseek's own DOM is never
+# modified) into a brand-new, independent table, and let DataTables
+# sort/filter/search *that*. To avoid duplicating the whole results
+# list on the page (a sortable copy on top of a second, static,
+# unfilterable copy below - worse than the original complaint), the
+# untouched original table stays hidden by default; clicking a target
+# name in the sortable index reveals it and jumps straight to that
+# row, where "Toggle" and everything else works exactly as Foldseek
+# built it, completely unmodified.
 _SORTABLE_TABLE_PATCH = """
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
@@ -69,6 +61,11 @@ _SORTABLE_TABLE_PATCH = """
             ? Array.prototype.map.call(headRow.children, function (th) { return th.textContent.trim(); })
             : [];
 
+        // Foldseek auto-expands the top hit's alignment on load via an
+        // extra sibling <tr> with no header-column match (2 <td>s:
+        // alignment text + TM-score) - it has no result-row anchor, so
+        // filtering on that anchor's presence both identifies genuine
+        // result rows and skips it, without ever touching it.
         var rows = Array.prototype.filter.call(tbody.children, function (tr) {
             return !!tr.querySelector("a[name^='aln']");
         }).map(function (tr) {
@@ -82,7 +79,7 @@ _SORTABLE_TABLE_PATCH = """
 
         var caption = document.createElement("p");
         caption.style.fontSize = "0.9em";
-        caption.textContent = "Sortable, searchable index - click a target name to jump to its full alignment below.";
+        caption.textContent = "Sortable, searchable index - click a target name to view its full alignment.";
 
         var newTable = document.createElement("table");
         newTable.id = "sortable-results-table";
@@ -106,6 +103,9 @@ _SORTABLE_TABLE_PATCH = """
                     var a = document.createElement("a");
                     a.href = "#" + row.anchor;
                     a.textContent = text;
+                    a.addEventListener("click", function () {
+                        origTable.style.display = "";  // reveal on demand - browser then jumps to #anchor natively
+                    });
                     td.appendChild(a);
                 } else {
                     td.textContent = text;
@@ -117,6 +117,7 @@ _SORTABLE_TABLE_PATCH = """
         newTable.appendChild(newBody);
 
         try {
+            origTable.style.display = "none";
             origTable.parentNode.insertBefore(caption, origTable);
             origTable.parentNode.insertBefore(newTable, origTable);
             $(newTable).DataTable({
@@ -124,8 +125,8 @@ _SORTABLE_TABLE_PATCH = """
                 order: []
             });
         } catch (e) {
-            // Leave the original table fully working either way - the
-            // sortable index is a bonus, not load-bearing.
+            // Fall back to Foldseek's original, fully working table.
+            origTable.style.display = "";
             caption.remove();
             newTable.remove();
         }
