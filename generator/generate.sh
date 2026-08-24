@@ -77,6 +77,7 @@ if [ -f "$ASSETS/euk_virus_homolog_search/results.tsv" ]; then
         --tsv "$RESULTS_TSV" \
         --aligned-structures-dir work/euk_virus_aligned_structures \
         --query-structures-dir "$ASSETS/structures/EVADES_v1" \
+        --evades-json pipeline/assets/EVADES.json \
         --out-dir "$ASSETS/homologs"
 else
     echo "  (skipped - no $ASSETS/euk_virus_homolog_search/results.tsv; using $ASSETS/homologs/ as-is)"

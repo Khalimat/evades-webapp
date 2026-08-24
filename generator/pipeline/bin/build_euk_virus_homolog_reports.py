@@ -36,6 +36,7 @@ Usage (from generator/):
         --tsv assets/euk_virus_homolog_search/results.tsv \\
         --aligned-structures-dir work/euk_virus_aligned_structures \\
         --query-structures-dir assets/structures/EVADES_v1 \\
+        --evades-json pipeline/assets/EVADES.json \\
         --out-dir assets/homologs
 """
 import argparse
@@ -44,12 +45,27 @@ import html
 import json
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 COLUMNS = [
     "query", "target", "fident", "alnlen", "qstart", "qend", "tstart", "tend",
     "prob", "alntmscore", "qtmscore", "ttmscore", "u", "t", "qaln", "taln", "lddt",
 ]
+
+
+def load_defence_names(evades_json_path: Path) -> Dict[str, str]:
+    """protein id (lowercased, matching query_structures/ filenames) ->
+    "anti-X protein" / "anti-X/Y protein" description, built from
+    EVADES.json's "defences" field (verbatim defence_name values, e.g.
+    "CRISPR-Cas", not shortened to "CRISPR")."""
+    entries = json.loads(evades_json_path.read_text())
+    result = {}
+    for entry in entries:
+        pid = entry.get("ID", "").lower()
+        defences = [d["defence_name"] for d in (entry.get("defences") or []) if d.get("defence_name")]
+        if pid and defences:
+            result[pid] = f"anti-{'/'.join(defences)} protein"
+    return result
 
 
 def read_hits(tsv_path: Path) -> List[Dict]:
@@ -82,7 +98,7 @@ def base_query_name(query: str, known_ids: set) -> str:
     return query
 
 
-def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Path) -> str:
+def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Path, defence_description: Optional[str]) -> str:
     rows = []
     missing = 0
     for hit in hits:
@@ -109,8 +125,10 @@ def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Pa
               f"run build_euk_virus_aligned_structures.py first if you haven't", file=sys.stderr)
 
     rows.sort(key=lambda r: -r["alntmscore"])
+    subtitle = f", {defence_description}," if defence_description else ""
     return _TEMPLATE.format(
         query=html.escape(query),
+        subtitle=html.escape(subtitle),
         n_hits=len(rows),
         data_json=json.dumps(rows),
     )
@@ -120,27 +138,145 @@ _TEMPLATE = """<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{query} - eukaryotic virus homologs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/jquery.dataTables.min.css">
 <style>
-  body {{ font-family: -apple-system, sans-serif; margin: 2rem; }}
-  #viewer {{ width: 100%; height: 420px; border: 1px solid #ccc; margin-bottom: 1rem; }}
-  #viewer-caption {{ font-size: 0.9em; color: #555; margin-bottom: 0.5rem; }}
+  :root {{
+    --c-black: #1a1c1a;
+    --c-text: #1a1c1a;
+    --c-muted: #707372;
+    --c-blue: #3b6fb6;
+    --c-blue-dark: #193f90;
+    --c-blue-light: #8bb8e8;
+    --c-border: #d0d0ce;
+    --font-sans: "IBM Plex Sans", Helvetica, Arial, sans-serif;
+  }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    font-family: var(--font-sans);
+    color: var(--c-text);
+    margin: 0;
+    background: #fff;
+    line-height: 1.5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }}
+  a {{ color: var(--c-blue); }}
+  a:hover, a:focus {{ color: var(--c-blue-dark); }}
+  .masthead {{
+    background: var(--c-black);
+    color: #fff;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }}
+  .masthead-inner {{
+    width: 88vw;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }}
+  .masthead-inner span {{ opacity: 0.85; }}
+  .masthead-inner a {{ color: #fff; opacity: 0.85; text-decoration: none; font-size: 12px; text-transform: none; letter-spacing: normal; }}
+  .masthead-inner a:hover {{ opacity: 1; text-decoration: underline; }}
+  .title-band {{
+    background: var(--c-blue-dark);
+    color: #fff;
+    border-bottom: 4px solid var(--c-blue);
+  }}
+  .title-band-inner {{
+    width: 88vw;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 28px 20px 22px;
+  }}
+  .title-band h1 {{
+    margin: 0;
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.35;
+  }}
+  .title-band p {{
+    margin: 8px 0 0;
+    font-size: 14px;
+    color: var(--c-blue-light);
+  }}
+  .title-band p a {{ color: var(--c-blue-light); }}
+  .page {{
+    width: 88vw;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 24px 20px 60px;
+    flex: 1;
+  }}
+  #viewer-wrap {{
+    background: #fafafa;
+    border: 1px solid var(--c-border);
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+  }}
+  #viewer {{ width: 100%; height: 420px; }}
+  #viewer-caption {{ font-size: 13px; color: var(--c-muted); padding: 8px 12px; border-top: 1px solid var(--c-border); }}
   table.dataTable {{ font-size: 0.9em; }}
   a.view-link, a.download-link {{ cursor: pointer; }}
+  footer {{
+    width: 88vw;
+    max-width: 1600px;
+    margin: auto auto 0;
+    padding: 20px 20px 40px;
+    border-top: 1px solid var(--c-border);
+    color: var(--c-muted);
+    font-size: 13px;
+  }}
+  .cite-us {{ margin-bottom: 16px; }}
+  .cite-us-heading {{
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--c-muted);
+  }}
+  .cite-us-text {{ margin: 0 0 2px; font-size: 12px; color: var(--c-muted); }}
 </style>
 </head>
 <body>
-<h1>{query} &mdash; eukaryotic dsDNA virus homologs</h1>
-<p>{n_hits} hits (TM-score &ge; the filter used at search time). Click "View" to load a hit's
-aligned structure below - chain A (blue) is {query} unmodified, chain B (red) is the target
-superposed onto it using Foldseek's own alignment transform, applied to the target's real
-full-atom predicted structure where one was available (falls back to Foldseek's own
-Calpha-only structure, target chain only, otherwise - single chain in that case).
+<div class="masthead">
+  <div class="masthead-inner">
+    <span>Bacterial virus anti-defence systems &middot; sequence &amp; structure resource</span>
+    <a href="../../details/{query}/">&larr; Back to {query}</a>
+  </div>
+</div>
+<div class="title-band">
+  <div class="title-band-inner">
+    <h1>Homologs of {query}{subtitle} in eukaryotic dsDNA viruses</h1>
+    <p>{n_hits} hits (TM-score &ge; the filter used at search time), found by structural search against
+    a database of AlphaFold-predicted eukaryotic viral protein structures from
+    <a href="https://doi.org/10.1038/s41586-024-07809-y" target="_blank">Nomburg et al.,
+    "Birth of protein folds and functions in the virome", <i>Nature</i> 633, 710&ndash;717 (2024)</a>.</p>
+  </div>
+</div>
+
+<div class="page">
+<p>Click "View" to load a hit's aligned structure below - chain A (blue) is {query} unmodified,
+chain B (red) is the target superposed onto it using Foldseek's own alignment transform, applied
+to the target's real full-atom predicted structure where one was available (falls back to
+Foldseek's own Calpha-only structure, target chain only, otherwise - single chain in that case).
 "Download" gets the same structure as a .pdb file.</p>
 
-<div id="viewer-caption">No structure loaded - click "View" on any row.</div>
-<div id="viewer"></div>
+<div id="viewer-wrap">
+  <div id="viewer"></div>
+  <div id="viewer-caption">No structure loaded - click "View" on any row.</div>
+</div>
 
 <table id="hits" class="display">
 <thead><tr>
@@ -149,6 +285,23 @@ Calpha-only structure, target chain only, otherwise - single chain in that case)
 </tr></thead>
 <tbody></tbody>
 </table>
+</div>
+
+<footer>
+  <div class="cite-us">
+    <p class="cite-us-heading">Cite us</p>
+    <p class="cite-us-text">EVADES: Encyclopaedia of bacterial virus anti-defence systems</p>
+    <p class="cite-us-text">Khalimat Murtazalieva, Evangelos Karatzas, Jiawei Wang, Robert D. Finn</p>
+  </div>
+  <div class="cite-us">
+    <p class="cite-us-heading">Target structure database</p>
+    <p class="cite-us-text">Nomburg, J., Doherty, E.E., Price, N., Bellieny-Rabelo, D., Zhu, Y.K.,
+    Doudna, J.A. Birth of protein folds and functions in the virome.
+    <i>Nature</i> 633, 710&ndash;717 (2024).
+    <a href="https://doi.org/10.1038/s41586-024-07809-y" target="_blank">doi.org/10.1038/s41586-024-07809-y</a></p>
+  </div>
+  Encyclopaedia of Bacterial Virus Anti-Defence Systems
+</footer>
 
 <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
@@ -163,7 +316,10 @@ function loadStructure(pdbText, label) {{
             "No structure for " + label + ".";
         return;
     }}
-    if (!stage) stage = new NGL.Stage("viewer");
+    if (!stage) {{
+        stage = new NGL.Stage("viewer");
+        stage.setParameters({{ backgroundColor: "#fafafa" }});
+    }}
     stage.removeAllComponents();
     document.getElementById("viewer-caption").textContent = "Loading " + label + " ...";
     // Loaded from a Blob built from data embedded in this page, not a
@@ -245,8 +401,12 @@ def main() -> None:
                          help="assets/structures/EVADES_v1 - used to know the canonical protein IDs "
                               "(for collapsing multi-chain queries like dam_A, dam_B, ... back to one report per protein)")
     parser.add_argument("--out-dir", required=True, type=Path, help="assets/homologs - written in place")
+    parser.add_argument("--evades-json", required=True, type=Path,
+                         help="pipeline/assets/EVADES.json - used to look up each protein's "
+                              "defence_name(s) for the report title (e.g. 'anti-CRISPR-Cas protein')")
     args = parser.parse_args()
 
+    defence_names = load_defence_names(args.evades_json)
     known_ids = load_known_query_ids(args.query_structures_dir)
     hits = read_hits(args.tsv)
     print(f"Read {len(hits)} hits for {len(set(h['query'] for h in hits))} raw queries from {args.tsv}")
@@ -269,7 +429,7 @@ def main() -> None:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     for query, query_hits in sorted(by_query.items()):
-        report_html = render_query_report(query, query_hits, args.aligned_structures_dir)
+        report_html = render_query_report(query, query_hits, args.aligned_structures_dir, defence_names.get(query))
         out_path = args.out_dir / f"{query}.html"
         out_path.write_text(report_html)
         print(f"  wrote {out_path} ({len(query_hits)} hits)")
