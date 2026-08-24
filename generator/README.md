@@ -70,6 +70,21 @@ a fresh SQLite DB at `website/anti_defence/anti_defence.sqlite3`:
 Takes ~15-20 minutes, mostly S4PRED (CPU-only, and emulated if you're on
 Apple Silicon since the biocontainer is linux/amd64 only).
 
+**Footgun**: `update_proteins.py` unconditionally sets `pdb_blob`,
+`euk_virus_homologs_blob`, and `pred_secondary_structure_blob` to
+`None` in its `update_or_create` defaults — it doesn't check whether
+they were already populated. Re-running *only* `update_proteins.py`
+against an already-populated DB (e.g. to refresh `pdb_filename` after
+a metadata change) silently wipes those three blobs for every
+protein, even though the rest of the DB looks fine. This actually
+happened once — regenerated pages were missing the secondary-structure
+viewer and all `euk_virus_homologs` pages with no error anywhere.
+**Always re-run the full step-5 chain together** (`update_proteins.py`
+→ `update_pdb_blobs.py` → `update_euk_virus_homolog_blobs.py` →
+`update_protein_pfams.py` → `update_secondary_structure_blobs.py`),
+never `update_proteins.py` alone — `generate.sh` already does this
+correctly; only skip steps if you're calling the scripts by hand.
+
 ### Why a shell script and not `nextflow run pipeline`?
 
 The original repo's `main.nf` is the "real"/reproducible way to run this
