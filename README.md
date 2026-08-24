@@ -82,45 +82,71 @@ nothing else changes.
 - [ ] `data/foldseek/evades_structures_db*` — your Foldseek DB of 268 structures
 - [ ] `data/downloads/*` — the four bulk-download files
 - [ ] `frontend/explore/` — the pre-rendered Explore pages (`generator/export_static.py`; see `generator/README.md`)
-- [ ] Swap `CORSMiddleware allow_origins=["*"]` in `backend/app/main.py` for your real domain
-- [ ] Put this behind HTTPS (Caddy or nginx + certbot) once it has a public domain
+- [ ] `.env` with `DOMAIN=your.real.domain` — see "Deploying to a public server"
+
+CORS and HTTPS are both handled by `docker-compose.prod.yml` (below) —
+nothing to hand-edit in `backend/app/main.py`.
 
 ## Deploying to a public server
 
 Nothing about this repo is unusual — it's meant to be portable to any
-VM (Hetzner, DigitalOcean, EMBL-EBI's Embassy Cloud, ...).
+VM. [Hetzner Cloud](https://www.hetzner.com/cloud/) is the recommended
+option: a CX22 (2 vCPU/4GB/40GB, ~€3.79/mo) covers low/no concurrent
+traffic; a CX32 (4 vCPU/8GB, ~€7.55/mo) comfortably runs 2 worker
+replicas in parallel — see "Handling concurrent requests" above for
+sizing beyond that.
 
-1. **Get a server.** A small VPS is plenty — HMMER/Foldseek searches
-   are small per-request jobs, not the heavy one-time pipeline build
-   in `generator/`. 2GB RAM / 2 vCPU covers low/no concurrent traffic
-   (1 worker replica); see "Handling concurrent requests" below for
-   sizing up if you expect multiple searches running at once.
-2. **Get a domain and point it at the server.** Buy one anywhere,
-   then add an A record to the VM's IP. DNS propagation can take a
-   few minutes to a few hours.
-3. **Install Docker on the server:**
+1. **Create the server.** Sign up, add an SSH key, create a CX22 or
+   CX32 instance (Ubuntu 24.04 image). Note its IP.
+2. **Get a domain and point it at the server.** Buy one anywhere, add
+   an A record to the VM's IP. DNS propagation can take minutes to
+   hours — do this early so it's ready by step 6.
+3. **SSH in and install Docker:**
    ```bash
+   ssh root@<server-ip>
    curl -fsSL https://get.docker.com | sh
    ```
-4. **Get the code onto the server** — push this repo to its remote,
-   then `git clone` + check out the right branch on the server.
-5. **Move the data that isn't in git.** `data/hmm/`, `data/foldseek/`,
-   `data/downloads/`, and `frontend/explore/` are all gitignored
-   (large generated/scientific artifacts, not source) and need to
-   travel separately — `rsync`/`scp` them across. For `frontend/explore/`
-   specifically, it's easiest to copy the already-built output rather
-   than re-running the whole `generator/` pipeline on the server; only
-   re-run that when the underlying protein dataset actually changes.
-6. **Tighten CORS and add HTTPS** — the two checklist items above.
-   [Caddy](https://caddyserver.com/) in front of (or instead of) the
-   `nginx` container is the simplest way to get an auto-renewing
-   Let's Encrypt cert with just a few lines of config.
-7. **Bring it up:**
+4. **Get the code onto the server:**
    ```bash
-   docker compose up -d --build
+   git clone git@github.com:Khalimat/evades-webapp.git
+   cd evades-webapp
    ```
-   same as locally. Check `docker compose ps`, then hit the domain in
-   a browser.
+   (needs a deploy key or token if the repo is private — GitHub's docs
+   cover that; simplest is generating a new SSH key on the server and
+   adding it to the repo's Deploy keys.)
+5. **Move the data that isn't in git**, from your Mac:
+   ```bash
+   rsync -avz data/hmm data/foldseek data/downloads frontend/explore \
+     root@<server-ip>:~/evades-webapp/data/  # adjust destination per dir — see note below
+   ```
+   `data/hmm/`, `data/foldseek/`, `data/downloads/`, and
+   `frontend/explore/` are all gitignored (large generated/scientific
+   artifacts, not source). `frontend/explore/` goes to
+   `evades-webapp/frontend/explore/`, not under `data/` — run the
+   `rsync` per-directory to its matching path, or `tar czf - data
+   frontend/explore | ssh root@<server-ip> 'cd evades-webapp && tar
+   xzf -'` to move everything in one shot.
+6. **Configure the domain:**
+   ```bash
+   cp .env.example .env
+   # edit .env: DOMAIN=your.real.domain
+   ```
+7. **Open the firewall** (Hetzner Cloud Firewall, or `ufw` on the
+   server) for ports **22, 80, 443** only — nothing else needs to be
+   public.
+8. **Bring it up:**
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   ```
+   This adds [Caddy](https://caddyserver.com/) in front of `nginx`,
+   which automatically requests and renews a Let's Encrypt cert for
+   `DOMAIN` (needs step 2's DNS to have propagated first), and sets
+   `CORS_ORIGINS=https://$DOMAIN` on the `api` container. Check
+   `docker compose ps` and `docker compose logs caddy`, then visit
+   `https://your.real.domain`.
+
+For local dev, keep using plain `docker compose up --build` (no
+`-f docker-compose.prod.yml`) — that's unaffected by any of this.
 
 The only optional extra step is migrating the Postgres volume if you
 want job history to persist across the move (`pg_dump`/`pg_restore`)

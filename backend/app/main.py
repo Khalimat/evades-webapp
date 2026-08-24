@@ -35,9 +35,14 @@ queue = Queue("default", connection=redis_conn)
 
 app = FastAPI(title="EVADES Search API")
 
+# "*" (default) is fine for local dev — same-origin anyway, nginx proxies
+# /api/ on the same host:port the frontend is served from. In production
+# set CORS_ORIGINS to your real domain(s), comma-separated, e.g.
+# "https://evades.example.org" — see README's deploy section.
+_cors_origins = os.environ.get("CORS_ORIGINS", "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this to your real frontend origin in production
+    allow_origins=["*"] if _cors_origins == "*" else _cors_origins.split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

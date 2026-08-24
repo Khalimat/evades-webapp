@@ -1,0 +1,41 @@
+# Production overlay: adds Caddy for automatic HTTPS (Let's Encrypt) in
+# front of nginx. Local dev is unaffected — this file only applies when
+# explicitly included.
+#
+# Usage:
+#   cp .env.example .env   # then set DOMAIN=your.real.domain
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# DNS: point an A record for DOMAIN at this server's IP before starting
+# Caddy, or it can't get a cert.
+#
+# nginx's own "8080:80" port mapping (from docker-compose.yml) is left
+# as-is rather than removed here — Compose merges list fields by
+# concatenating, not replacing, so cleanly clearing it needs YAML merge
+# tags only supported on recent Compose versions. It's harmless: only
+# open 80/443/22 in the server's firewall (see README) and 8080 is
+# simply unreachable from outside, Caddy is the only real entrypoint.
+services:
+  api:
+    environment:
+      CORS_ORIGINS: https://${DOMAIN}
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [nginx]
+    networks: [main]
+
+volumes:
+  caddy_data:
+  caddy_config:
+
