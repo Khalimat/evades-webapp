@@ -80,3 +80,34 @@ def test_inhibited_defence_looks_up_metadata_tsv(tmp_path, monkeypatch):
     assert _inhibited_defence("unknown_id") == ""
 
     tasks._load_metadata.cache_clear()
+
+
+def test_base_protein_name_collapses_multimer_chains(tmp_path, monkeypatch):
+    # Protein IDs that themselves contain underscores (or even a
+    # trailing one) — a blind "strip the last _segment" would mangle
+    # these, so the known-ID set has to be consulted.
+    metadata = tmp_path / "metadata.tsv"
+    metadata.write_text(
+        "ID\tDefences\n"
+        "acrib4\t_\n"
+        "gp5_9\t_\n"
+        "acrvia2_plus\t_\n"
+        "acrif18_\t_\n"
+    )
+    monkeypatch.setattr(tasks, "METADATA_TSV", metadata)
+    tasks._load_metadata.cache_clear()
+
+    # Plain multi-chain (no NMR model ensemble).
+    assert _base_protein_name("acrib4_A") == "acrib4"
+    assert _base_protein_name("acrib4_B") == "acrib4"
+    # Protein ID itself contains an underscore.
+    assert _base_protein_name("gp5_9_B") == "gp5_9"
+    assert _base_protein_name("acrvia2_plus_A") == "acrvia2_plus"
+    # Protein ID literally ends in "_".
+    assert _base_protein_name("acrif18__A") == "acrif18_"
+    # NMR ensemble model + chain, on top of a multi-chain protein.
+    assert _base_protein_name("acrib4_MODEL_2_A") == "acrib4"
+    # Unknown/single-chain names are left alone.
+    assert _base_protein_name("acrib4") == "acrib4"
+
+    tasks._load_metadata.cache_clear()

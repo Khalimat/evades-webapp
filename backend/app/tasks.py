@@ -64,7 +64,22 @@ FOLDSEEK_TM_SCORE_MIN = float(os.environ.get("FOLDSEEK_TM_SCORE_MIN", "0.5"))
 
 
 def _base_protein_name(target: str) -> str:
-    return MODEL_SUFFIX_RE.sub("", target)
+    """Foldseek also appends "_<chain id>" for each chain of a
+    multi-chain (multimer) structure, e.g. "acrib4_A", "acrib4_B" —
+    on top of the "_MODEL_n_<chain>" suffix for multi-model NMR
+    ensembles. Some protein IDs themselves contain underscores (e.g.
+    "gp5_9", "acrvia2_plus", even a literal trailing "_" as in
+    "acrif18_"), so a blind regex strip of the last "_..." segment
+    would mangle those — match against the known ID set instead."""
+    target = MODEL_SUFFIX_RE.sub("", target)
+    known_ids = _load_metadata()
+    if target in known_ids:
+        return target
+    if "_" in target:
+        prefix = target.rsplit("_", 1)[0]
+        if prefix in known_ids:
+            return prefix
+    return target
 
 
 def run_hmmsearch(fasta_path: str) -> dict:
