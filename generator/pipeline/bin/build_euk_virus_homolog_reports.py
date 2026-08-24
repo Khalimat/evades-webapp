@@ -68,6 +68,24 @@ def load_defence_names(evades_json_path: Path) -> Dict[str, str]:
     return result
 
 
+def parse_target_identifier(target: str):
+    """Foldseek DB entries are named
+    "<protein name>__<NCBI accession>__<species>__<taxid>.pdb" - split
+    into the three pieces the report shows as separate columns.
+    Falls back to showing the raw identifier as the name (accession/
+    species blank) if a target doesn't follow that convention."""
+    stem = target[:-4] if target.endswith(".pdb") else target
+    parts = stem.split("__")
+    if len(parts) == 4:
+        name, accession, species, taxid = parts
+        name = name.replace("_", " ")
+        if name:
+            name = name[0].upper() + name[1:]
+        species = f"{species.replace('_', ' ')} {taxid}"
+        return name, accession, species
+    return stem, "", ""
+
+
 def read_hits(tsv_path: Path) -> List[Dict]:
     hits = []
     with tsv_path.open() as f:
@@ -98,7 +116,8 @@ def base_query_name(query: str, known_ids: set) -> str:
     return query
 
 
-def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Path, defence_description: Optional[str]) -> str:
+def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Path,
+                         defence_description: Optional[str], tmscore_threshold: float) -> str:
     rows = []
     missing = 0
     for hit in hits:
@@ -109,8 +128,12 @@ def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Pa
             pdb_text = src.read_text(errors="replace")
         else:
             missing += 1
+        target_name, target_accession, target_species = parse_target_identifier(hit["target"])
+        download_filename = f"{query}_{target_accession}.pdb" if target_accession else f"{query}_{target}.pdb"
         rows.append({
-            "target": hit["target"],
+            "target_name": target_name,
+            "target_accession": target_accession,
+            "target_species": target_species,
             "fident": round(float(hit["fident"]), 3),
             "alntmscore": round(min(float(hit["alntmscore"]), 1.0), 3),
             "prob": round(float(hit["prob"]), 3),
@@ -119,6 +142,7 @@ def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Pa
             "target_pos": f"{hit['tstart']}-{hit['tend']}",
             "lddt": round(float(hit["lddt"]), 3),
             "structure_pdb": pdb_text,
+            "download_filename": download_filename,
         })
     if missing:
         print(f"  WARN {query}: no aligned structure found for {missing}/{len(hits)} hits - "
@@ -130,6 +154,7 @@ def render_query_report(query: str, hits: List[Dict], aligned_structures_dir: Pa
         query=html.escape(query),
         subtitle=html.escape(subtitle),
         n_hits=len(rows),
+        tmscore_threshold=tmscore_threshold,
         data_json=json.dumps(rows),
     )
 
@@ -259,7 +284,7 @@ _TEMPLATE = """<!doctype html>
 <div class="title-band">
   <div class="title-band-inner">
     <h1>Homologs of {query}{subtitle} in eukaryotic dsDNA viruses</h1>
-    <p>{n_hits} hits (TM-score &ge; the filter used at search time), found by structural search against
+    <p>{n_hits} hits (TM-score &ge; {tmscore_threshold}), found by structural search against
     a database of AlphaFold-predicted eukaryotic viral protein structures from
     <a href="https://doi.org/10.1038/s41586-024-07809-y" target="_blank">Nomburg et al.,
     "Birth of protein folds and functions in the virome", <i>Nature</i> 633, 710&ndash;717 (2024)</a>.</p>
@@ -267,11 +292,8 @@ _TEMPLATE = """<!doctype html>
 </div>
 
 <div class="page">
-<p>Click "View" to load a hit's aligned structure below - chain A (blue) is {query} unmodified,
-chain B (red) is the target superposed onto it using Foldseek's own alignment transform, applied
-to the target's real full-atom predicted structure where one was available (falls back to
-Foldseek's own Calpha-only structure, target chain only, otherwise - single chain in that case).
-"Download" gets the same structure as a .pdb file.</p>
+<p>Click "View" to load a hit's aligned structure below - chain A (blue) is {query}, chain B (red)
+is the homolog from dsDNA viruses.</p>
 
 <div id="viewer-wrap">
   <div id="viewer"></div>
@@ -280,7 +302,8 @@ Foldseek's own Calpha-only structure, target chain only, otherwise - single chai
 
 <table id="hits" class="display">
 <thead><tr>
-  <th>Target</th><th>Seq. Identity</th><th>TM-score</th><th>Prob.</th>
+  <th>Protein name</th><th>NCBI Protein ID</th><th>Species</th>
+  <th>Seq. Identity</th><th>TM-score</th><th>Prob.</th>
   <th>Aln. Length</th><th>Query Pos.</th><th>Target Pos.</th><th>LDDT</th><th></th>
 </tr></thead>
 <tbody></tbody>
@@ -356,10 +379,12 @@ function downloadStructure(pdbText, filename) {{
 $(document).ready(function () {{
     var table = $("#hits").DataTable({{
         pageLength: 25,
-        order: [[2, "desc"]],
+        order: [[4, "desc"]],
         data: ROWS,
         columns: [
-            {{ data: "target" }},
+            {{ data: "target_name" }},
+            {{ data: "target_accession" }},
+            {{ data: "target_species" }},
             {{ data: "fident" }},
             {{ data: "alntmscore" }},
             {{ data: "prob" }},
@@ -380,11 +405,11 @@ $(document).ready(function () {{
 
     $("#hits tbody").on("click", "a.view-link", function () {{
         var row = table.row($(this).closest("tr")).data();
-        loadStructure(row.structure_pdb, row.target);
+        loadStructure(row.structure_pdb, row.target_name);
     }});
     $("#hits tbody").on("click", "a.download-link", function () {{
         var row = table.row($(this).closest("tr")).data();
-        downloadStructure(row.structure_pdb, row.target + ".pdb");
+        downloadStructure(row.structure_pdb, row.download_filename);
     }});
 }});
 </script>
@@ -404,6 +429,10 @@ def main() -> None:
     parser.add_argument("--evades-json", required=True, type=Path,
                          help="pipeline/assets/EVADES.json - used to look up each protein's "
                               "defence_name(s) for the report title (e.g. 'anti-CRISPR-Cas protein')")
+    parser.add_argument("--tmscore-threshold", type=float, default=0.5,
+                         help="the TM-score cutoff results.tsv was actually filtered at "
+                              "(run_foldseek_search.sh's TMSCORE_THRESHOLD, default 0.5) - "
+                              "shown in the report, purely informational, doesn't re-filter anything")
     args = parser.parse_args()
 
     defence_names = load_defence_names(args.evades_json)
@@ -429,7 +458,8 @@ def main() -> None:
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
     for query, query_hits in sorted(by_query.items()):
-        report_html = render_query_report(query, query_hits, args.aligned_structures_dir, defence_names.get(query))
+        report_html = render_query_report(query, query_hits, args.aligned_structures_dir,
+                                           defence_names.get(query), args.tmscore_threshold)
         out_path = args.out_dir / f"{query}.html"
         out_path.write_text(report_html)
         print(f"  wrote {out_path} ({len(query_hits)} hits)")
