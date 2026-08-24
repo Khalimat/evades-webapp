@@ -62,6 +62,26 @@ docker run --rm -v "$(pwd)/$ASSETS":/data \
 $PY pipeline/bin/parse_s4pred_to_feature_viewer.py \
     "$ASSETS/s4pred_out" "$ASSETS/s4pred_features"
 
+echo "==> Eukaryotic-virus homolog structural search (optional - only if $ASSETS/euk_virus_homolog_search/results.tsv exists)"
+if [ -f "$ASSETS/euk_virus_homolog_search/results.tsv" ]; then
+    RESULTS_TSV="$ASSETS/euk_virus_homolog_search/results.tsv"
+    $PY pipeline/bin/fetch_euk_virus_target_structures.py \
+        --tsv "$RESULTS_TSV" \
+        --out-dir work/euk_virus_target_structures_cif
+    $PY pipeline/bin/build_euk_virus_aligned_structures.py \
+        --tsv "$RESULTS_TSV" \
+        --query-structures-dir "$ASSETS/structures/EVADES_v1" \
+        --target-cif-dir work/euk_virus_target_structures_cif \
+        --out-dir work/euk_virus_aligned_structures
+    $PY pipeline/bin/build_euk_virus_homolog_reports.py \
+        --tsv "$RESULTS_TSV" \
+        --aligned-structures-dir work/euk_virus_aligned_structures \
+        --query-structures-dir "$ASSETS/structures/EVADES_v1" \
+        --out-dir "$ASSETS/homologs"
+else
+    echo "  (skipped - no $ASSETS/euk_virus_homolog_search/results.tsv; using $ASSETS/homologs/ as-is)"
+fi
+
 echo "==> Loading everything into the DB"
 (cd website/anti_defence && \
     ../../"$PY" ../../pipeline/bin/update_proteins.py \
