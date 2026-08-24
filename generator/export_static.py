@@ -10,9 +10,11 @@ outputs change.
 Usage (from generator/):
     ./.venv/bin/python export_static.py
 """
+import json
 import os
 import shutil
 import sys
+import zipfile
 from pathlib import Path
 
 GENERATOR_DIR = Path(__file__).resolve().parent
@@ -43,7 +45,7 @@ django.setup()
 
 from django.test import Client  # noqa: E402
 from django.urls import set_script_prefix  # noqa: E402
-from explorer.models import Protein  # noqa: E402
+from explorer.models import Protein, ProteinDefences, ProteinPfams  # noqa: E402
 
 set_script_prefix(SCRIPT_PREFIX)
 
@@ -53,6 +55,67 @@ def save(url_path: str, content: bytes) -> None:
     target_dir = OUT_DIR / url_path.strip("/")
     target_dir.mkdir(parents=True, exist_ok=True)
     (target_dir / "index.html").write_bytes(content)
+
+
+def build_download_zip(protein: Protein) -> None:
+    """One "download everything about this protein" bundle per detail
+    page: sequence, structure file, secondary-structure JSON, homolog
+    HTML (whichever of those exist), plus a metadata.json summary —
+    the same data the detail page shows, machine-readable in one
+    place instead of scattered across separate download buttons."""
+    target_dir = OUT_DIR / "details" / protein.id
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    defences = [
+        {"name": d.defence_name, "link": d.defence_link}
+        for d in ProteinDefences.objects.filter(protein=protein)
+    ]
+    pfams = [
+        {
+            "name": p.pfam_name,
+            "accession": p.pfam_accession,
+            "length": p.pfam_length,
+            "evalue": p.e_value,
+            "hmm_from": p.hmm_from,
+            "hmm_to": p.hmm_to,
+            "ali_from": p.ali_from,
+            "ali_to": p.ali_to,
+            "env_from": p.env_from,
+            "env_to": p.env_to,
+        }
+        for p in ProteinPfams.objects.filter(protein=protein)
+    ]
+    metadata = {
+        "id": protein.id,
+        "name": protein.name,
+        "moa": protein.moa,
+        "moa_category": protein.moa_category,
+        "evidence": protein.evidence,
+        "defence_subtype": protein.defence_subtype,
+        "doi": protein.doi,
+        "multicomponent": protein.multicomponent,
+        "pdb": protein.pdb,
+        "structure_type": protein.structure_type,
+        "protein_source_name": protein.protein_source_name,
+        "protein_source_link": protein.protein_source_link,
+        "defences": defences,
+        "pfam_annotations": pfams,
+    }
+
+    with zipfile.ZipFile(target_dir / "download.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("metadata.json", json.dumps(metadata, indent=2))
+        if protein.sequence:
+            zf.writestr(f"{protein.id}.fasta", f">{protein.id}\n{protein.sequence}\n")
+        if protein.pdb_blob:
+            ext = Path(protein.pdb_filename or "structure.pdb").suffix or ".pdb"
+            zf.writestr(f"{protein.id}{ext}", protein.pdb_blob)
+        if protein.pred_secondary_structure_blob:
+            zf.writestr(
+                f"{protein.id}_secondary_structure.json",
+                protein.pred_secondary_structure_blob,
+            )
+        if protein.euk_virus_homologs_blob:
+            zf.writestr(f"{protein.id}_homologs.html", protein.euk_virus_homologs_blob)
 
 
 def fetch(client: Client, url_path: str) -> bool:
@@ -75,23 +138,20 @@ def main() -> None:
     fetch(client, "/")
     fetch(client, "/protein_list/")
 
-    proteins = list(
-        Protein.objects.all().values(
-            "id", "pdb_blob", "pred_secondary_structure_blob", "euk_virus_homologs_blob"
-        )
-    )
+    proteins = list(Protein.objects.all())
     print(f"Rendering {len(proteins)} protein detail pages + blobs ...")
     ok = 0
     for p in proteins:
-        pid = p["id"]
+        pid = p.id
         if fetch(client, f"/details/{pid}/"):
             ok += 1
-        if p["pdb_blob"] is not None:
+        if p.pdb_blob is not None:
             fetch(client, f"/serve_blob/{pid}/pdb_blob/")
-        if p["pred_secondary_structure_blob"] is not None:
+        if p.pred_secondary_structure_blob is not None:
             fetch(client, f"/serve_blob/{pid}/pred_secondary_structure_blob/")
-        if p["euk_virus_homologs_blob"] is not None:
+        if p.euk_virus_homologs_blob is not None:
             fetch(client, f"/euk_virus_homologs/{pid}/")
+        build_download_zip(p)
     print(f"Detail pages rendered: {ok}/{len(proteins)}")
 
     static_src = WEBSITE_DIR / "explorer" / "static" / "explorer"
