@@ -89,6 +89,9 @@ nothing to hand-edit in `backend/app/main.py`.
 
 ## Deploying to a public server
 
+Already have a server running? See `OPERATIONS.md` for accessing it
+and pushing updates — this section is about setting up a new one.
+
 Nothing about this repo is unusual — it's meant to be portable to any
 VM. [Hetzner Cloud](https://www.hetzner.com/cloud/) is the recommended
 option: a CX22 (2 vCPU/4GB/40GB, ~€3.79/mo) covers low/no concurrent
