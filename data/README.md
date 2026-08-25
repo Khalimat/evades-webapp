@@ -34,10 +34,14 @@ data/
 bundles, and the Explore pages) are **deliberately different sets**, and
 the Foldseek DB must only ever be built from the monomer one.
 
-Several proteins (e.g. `gp5_9`, `acric5`) were predicted in complex with
-their binding partner (e.g. `gp5_9` with RecBCD, since it's a RecBCD
-inhibitor) — genuinely useful to show on the website, since the whole
-point is the protein's mechanism of action. But `foldseek createdb`
+This is a deliberate, systematic split, not incidental: whenever an
+ADP's defence-protein interaction is known (the curated `Defences`/`MoA`
+columns in `metadata.tsv`), the website deposits it as a multimer/complex
+predicted together with that defence protein — showing the actual
+mechanism of action is the whole point of that structure. `gp5_9` is
+deposited bound to RecBCD because it's a known RecBCD inhibitor;
+`acric5` likewise with its CRISPR target. Proteins with no known/modeled
+defence-protein partner stay single-chain. But `foldseek createdb`
 indexes every chain in a structure file separately, and the search
 result's chain-collapsing logic (`_base_protein_name` in
 `backend/app/tasks.py`) folds any `<protein>_<chain>` target name back

@@ -2,8 +2,10 @@
 after a real bug: the live Foldseek search DB (`data/foldseek/`) is
 built from `data/foldseek_monomer_structures/` (one chain per protein),
 while the website's downloads/Explore pages keep using
-`generator/assets/structures/EVADES_v1/` (which legitimately contains
-multimers/complexes for proteins predicted with their binding partner).
+`generator/assets/structures/EVADES_v1/` — which legitimately contains
+multimers/complexes wherever an ADP's defence-protein interaction is
+known (predicted bound to that defence protein, to show the actual
+mechanism of action), and single chains everywhere else.
 
 Mixing these up previously caused false hits: a multimer entry like
 `gp5_9` (predicted in complex with its target, RecBCD) got indexed by
