@@ -23,6 +23,8 @@ data/hmm/*
 !data/hmm/.gitkeep
 data/foldseek/*
 !data/foldseek/.gitkeep
+data/foldseek_monomer_structures/*
+!data/foldseek_monomer_structures/.gitkeep
 data/downloads/*
 !data/downloads/.gitkeep
 data/uploads/*

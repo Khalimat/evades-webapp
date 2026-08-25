@@ -82,6 +82,14 @@ If you only changed one of those directories (e.g. just regenerated
 `frontend/explore/` after an `EVADES.json` update), narrow the `tar`
 command to just that path — no need to re-send everything.
 
+**`data/foldseek/` (the built DB) and `data/downloads/predicted_structures.tar.gz`
+/ `frontend/explore/` intentionally come from different structure sets**
+— see "Monomer vs. multimer structures" in `data/README.md` before
+touching either. The sync command above only ever needs the *built*
+`data/foldseek/evades_structures_db*`, not the monomer source files
+(`data/foldseek_monomer_structures/` stays Mac-only, same as any other
+build input).
+
 **If you changed the underlying dataset** (new/updated proteins,
 structures, etc.), regenerate `frontend/explore/` and the Foldseek DB
 on your Mac first — see `generator/README.md` for the full pipeline,
