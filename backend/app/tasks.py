@@ -97,7 +97,7 @@ def run_hmmsearch(fasta_path: str) -> dict:
         cmd = [
             "hmmsearch",
             "--domtblout", str(domtblout),
-            "-E", "1e-5",          # e-value cutoff; use instead of --cut_ga since
+            "-E", "1e-3",          # e-value cutoff; use instead of --cut_ga since
                                     # not every profile in the library has a
                                     # curated GA (gathering) threshold set
             "--cpu", "2",
