@@ -32,9 +32,20 @@ METADATA_TSV = REPO_ROOT / "data" / "downloads" / "metadata.tsv"
 # partner) — the website/download source must keep these as multimers.
 KNOWN_MULTIMER_IDS = ["gp5_9", "acric5"]
 
+
+def _has_structure_files(directory: Path) -> bool:
+    # data/foldseek_monomer_structures/.gitkeep is deliberately tracked
+    # (so the directory exists on a fresh checkout) while the real
+    # .pdb/.cif files are gitignored — checking "any file at all" would
+    # see .gitkeep and wrongly think real data is present.
+    return directory.exists() and any(
+        p.suffix.lower() in (".pdb", ".cif") for p in directory.iterdir()
+    )
+
+
 pytestmark = pytest.mark.skipif(
-    not MONOMER_DIR.exists() or not any(MONOMER_DIR.iterdir()),
-    reason="data/foldseek_monomer_structures/ not present locally (gitignored data)",
+    not _has_structure_files(MONOMER_DIR),
+    reason="data/foldseek_monomer_structures/ has no structure files locally (gitignored data)",
 )
 
 
@@ -105,7 +116,9 @@ def test_foldseek_monomer_structures_are_single_chain():
     )
 
 
-@pytest.mark.skipif(not MULTIMER_DIR.exists(), reason="generator/assets/ not present locally")
+@pytest.mark.skipif(
+    not _has_structure_files(MULTIMER_DIR), reason="generator/assets/ not present locally"
+)
 @pytest.mark.parametrize("protein_id", KNOWN_MULTIMER_IDS)
 def test_website_download_source_keeps_multimers(protein_id):
     multimer_files = _structure_ids(MULTIMER_DIR)
