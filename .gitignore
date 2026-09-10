@@ -54,3 +54,6 @@ generator/website/anti_defence/staticfiles/
 generator/website/requirements.txt.original
 .nextflow*
 anti_defence-main.zip
+
+# pytest scratch (conftest.py points UPLOAD_DIR here)
+backend/tests/_uploads/
