@@ -82,6 +82,9 @@ replicas.
 3. `docker compose up --build`
 4. Open `http://localhost:8080`.
 
+To put this online at **`https://www.ebi.ac.uk/finn-srv/evades/`**, see
+[Going live](#going-live-kubernetes-at-wwwebiacukfinn-srvevades).
+
 Backend tests and lint:
 
 ```bash
@@ -116,7 +119,9 @@ additive (more entries), not functional changes. Regenerate
 `frontend/explore/` and the Foldseek DB **together** from the dataset
 — see the blob-wipe footgun documented in `generator/README.md`.
 
-## Deployment (Kubernetes, EMBL-EBI)
+## Going live (Kubernetes, at `www.ebi.ac.uk/finn-srv/evades/`)
+
+### How the containers map to Kubernetes
 
 The `docker-compose.yml` service graph maps directly onto Kubernetes
 resources:
@@ -126,13 +131,70 @@ resources:
 | nginx | Deployment + Service, behind the cluster Ingress (TLS terminated at the Ingress — no Caddy needed) |
 | frontend / explore pages | files served by nginx; baked into the nginx image or mounted from a volume |
 | api | Deployment + Service |
-| worker | Deployment with `replicas: N` — this is the concurrency knob (the equivalent of Compose's `--scale worker=N`) |
+| worker | Deployment with `replicas: N` — the concurrency knob (the equivalent of Compose's `--scale worker=N`) |
 | redis | Deployment + Service (ephemeral — the queue does not need to survive a restart) |
 | postgres | StatefulSet + PVC, or a managed database |
 | `./data` bind mount | ReadOnlyMany PVC or object-store sync, populated out of band — see [Reference data](#reference-data-not-in-git) |
-| `CORS_ORIGINS` (`.env`) | env var on the api Deployment, set to the public origin |
+| `CORS_ORIGINS` (`.env`) | env var on the api Deployment, set to `https://www.ebi.ac.uk` |
 
-Operational model:
+### The URL prefix
+
+The app will be served under a path, `/finn-srv/evades/`, not at a
+domain root. `www.ebi.ac.uk` is a front proxy that forwards that path
+to the service. It can do this in one of two ways, and the first
+question to settle with the EBI web team is **which**:
+
+- **Prefix stripped** (recommended) — the proxy removes
+  `/finn-srv/evades` before forwarding, so the backend still sees
+  requests at `/`. nginx needs **no changes**; only the browser-facing
+  HTML has to carry the prefix (steps 2–3).
+- **Prefix preserved** — the backend receives the full
+  `/finn-srv/evades/...` path and nginx must be taught about it
+  (step 4).
+
+Either way, `frontend/index.html` and the Explore pages must be built
+for the new location, because they emit absolute URLs.
+
+### Steps
+
+1. **Settle the prefix behaviour** with the EBI web team (see above).
+   Everything below follows from that answer.
+2. **Set the frontend base path.** In `frontend/index.html`, change
+   `<base href="/">` to `<base href="/finn-srv/evades/">`. Every link
+   in `index.html` / `app.js` is relative, so that is the only change
+   there.
+3. **Regenerate the Explore pages for the new path.** In
+   `generator/export_static.py` set
+   `SCRIPT_PREFIX = "/finn-srv/evades/explore/"` (the "back to home"
+   link is derived from it automatically), then re-run the generator
+   — see `generator/README.md`. The generated HTML bakes in absolute
+   paths, so a build made for local `/explore/` will 404 its CSS and
+   links under `/finn-srv/evades/`.
+4. **Only if the prefix is preserved:** in `nginx/default.conf`, move
+   every `location` under the prefix
+   (`/finn-srv/evades/`, `/finn-srv/evades/api/`,
+   `/finn-srv/evades/downloads/`, `/finn-srv/evades/explore/`),
+   keeping `proxy_pass http://api:8000/api/;` as-is. If the prefix is
+   stripped, leave this file untouched.
+5. **Set CORS.** `CORS_ORIGINS=https://www.ebi.ac.uk` on the api
+   Deployment.
+6. **Create the Kubernetes resources** per the mapping table above:
+   Deployments + Services for nginx, api, worker, redis; StatefulSet +
+   PVC (or a managed DB) for postgres; a ReadOnlyMany PVC (or
+   object-store sync) for `/data`; and the Ingress / front-proxy route
+   for `/finn-srv/evades/`.
+7. **Load the data that isn't in git** — the `/data` contents and
+   `frontend/explore/` — via the object-store or populated-volume
+   mechanism the team sets up (there is no SSH). See
+   [Reference data](#reference-data-not-in-git).
+8. **Deploy** by merging to `main`: CI builds the images, the rollout
+   picks them up.
+9. **Verify:** `https://www.ebi.ac.uk/finn-srv/evades/` loads;
+   `…/api/health` returns `{"status": "ok"}`; a test HMM search and a
+   test structure search both complete; `…/explore/protein_list/`
+   renders with styling; the four `…/downloads/*` files serve.
+
+### Operational model
 
 - **No SSH, no in-place edits.** All changes ship through git:
   PR → review → merge → CI builds images → rollout.
@@ -140,13 +202,13 @@ Operational model:
   (`hmmsearch --cpu 2`, `foldseek --threads 2`), so replicas don't
   fight over every core. Rule of thumb: **worker CPU ≈ 2 × the number
   of searches you want running genuinely in parallel.** Past that,
-  jobs wait in the queue for a few seconds rather than failing. For
-  the expected traffic one worker replica is enough; raise `replicas`
-  if that changes.
+  jobs wait in the queue for a few seconds rather than failing. One
+  worker replica covers the expected traffic; raise `replicas` if that
+  changes.
 - **State.** Only Postgres and the uploads volume hold state, and
   neither holds scientific data — job rows are bookkeeping, uploads
   are transient. Everything else is reproducible from git plus the
   reference data. Backups are optional.
 
-`OPERATIONS.md` describes the current interim single-VM deployment;
-it will be superseded once the Kubernetes deployment is in place.
+`OPERATIONS.md` describes the current interim single-VM deployment; it
+will be superseded once this is in place.
