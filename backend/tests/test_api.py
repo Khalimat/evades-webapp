@@ -1,3 +1,6 @@
+import os
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -105,6 +108,31 @@ def test_get_job_not_found(client, monkeypatch):
     resp = client.get("/api/jobs/does-not-exist")
 
     assert resp.status_code == 404
+
+
+def test_sweep_stale_uploads_removes_only_dirs_past_the_cutoff(tmp_path, monkeypatch):
+    monkeypatch.setattr(main_module, "UPLOAD_DIR", tmp_path)
+
+    stale = tmp_path / "stale_job"
+    stale.mkdir()
+    (stale / "q.fasta").write_text(">x\nMKT\n")
+    fresh = tmp_path / "fresh_job"
+    fresh.mkdir()
+    (fresh / "q.fasta").write_text(">x\nMKT\n")
+
+    old = time.time() - 48 * 3600
+    os.utime(stale, (old, old))
+
+    removed = main_module.sweep_stale_uploads(max_age_seconds=24 * 3600)
+
+    assert removed == 1
+    assert not stale.exists()
+    assert fresh.exists()
+
+
+def test_sweep_stale_uploads_handles_a_missing_upload_dir(tmp_path, monkeypatch):
+    monkeypatch.setattr(main_module, "UPLOAD_DIR", tmp_path / "nope")
+    assert main_module.sweep_stale_uploads() == 0
 
 
 def test_get_job_returns_status(client, monkeypatch):

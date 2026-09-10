@@ -10,6 +10,7 @@ Responsibilities:
 """
 import os
 import shutil
+import time
 import uuid
 from pathlib import Path
 
@@ -24,6 +25,12 @@ from .schemas import JobOut
 
 UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/data/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# The worker deletes each job's upload dir as soon as its search
+# finishes (app.tasks._cleanup_upload). This is the backstop for
+# orphans — uploads whose worker was killed mid-job, or whose enqueue
+# failed — swept on API startup. 24h by default.
+UPLOAD_MAX_AGE_SECONDS = int(os.environ.get("UPLOAD_MAX_AGE_SECONDS", 24 * 60 * 60))
 
 MAX_FASTA_BYTES = int(os.environ.get("MAX_FASTA_BYTES", 10 * 1024 * 1024))  # 10 MB
 MAX_FASTA_SEQUENCES = int(os.environ.get("MAX_FASTA_SEQUENCES", 500))
@@ -48,9 +55,36 @@ app.add_middleware(
 )
 
 
+def sweep_stale_uploads(max_age_seconds: int = UPLOAD_MAX_AGE_SECONDS) -> int:
+    """Remove leftover per-job upload directories older than
+    `max_age_seconds`. Returns how many were removed.
+
+    Under normal operation the worker has already deleted each job's
+    directory (app.tasks._cleanup_upload); this only catches orphans.
+    A cleanup failure here must never stop the API from starting.
+    """
+    if not UPLOAD_DIR.is_dir():
+        return 0
+    cutoff = time.time() - max_age_seconds
+    removed = 0
+    try:
+        entries = list(UPLOAD_DIR.iterdir())
+    except OSError:
+        return 0
+    for entry in entries:
+        try:
+            if entry.is_dir() and entry.stat().st_mtime < cutoff:
+                shutil.rmtree(entry, ignore_errors=True)
+                removed += 1
+        except OSError:
+            continue
+    return removed
+
+
 @app.on_event("startup")
 def on_startup():
     init_db()
+    sweep_stale_uploads()
 
 
 @app.get("/api/health")

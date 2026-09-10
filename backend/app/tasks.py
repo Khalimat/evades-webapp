@@ -11,6 +11,7 @@ import csv
 import functools
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -19,6 +20,32 @@ DATA_DIR = Path("/data")
 HMM_DB = DATA_DIR / "hmm" / "evades_profiles.hmm"          # `hmmpress`-ed HMM library
 FOLDSEEK_DB = DATA_DIR / "foldseek" / "evades_structures_db"  # `foldseek createdb` output
 METADATA_TSV = DATA_DIR / "downloads" / "metadata.tsv"      # curated EVADES protein metadata
+
+# Same path the `api` container writes uploads to (a volume shared by
+# both containers). The worker owns the *deletion* of these — see
+# _cleanup_upload.
+UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", "/data/uploads"))
+
+
+def _cleanup_upload(input_path: Path) -> None:
+    """Delete a finished job's upload directory.
+
+    `api` saves each upload as `<UPLOAD_DIR>/<uuid>/<filename>` and hands
+    the worker the path. Once the search has run, that file is dead
+    weight — the result is returned via the queue and persisted to
+    Postgres, never re-read from disk. Called from a `finally` so it
+    runs whether the search succeeded or raised.
+
+    Only ever removes a directory sitting directly under UPLOAD_DIR, and
+    never lets a cleanup failure turn a successful search into a failed
+    job.
+    """
+    try:
+        job_dir = Path(input_path).resolve().parent
+        if job_dir.parent == UPLOAD_DIR.resolve() and job_dir.is_dir():
+            shutil.rmtree(job_dir, ignore_errors=True)
+    except OSError:
+        pass
 
 
 @functools.lru_cache(maxsize=1)
@@ -86,6 +113,13 @@ def run_hmmsearch(fasta_path: str) -> dict:
     """Run hmmsearch of the query FASTA against the EVADES HMM profile
     database and return parsed hits."""
     fasta_path = Path(fasta_path)
+    try:
+        return _hmmsearch(fasta_path)
+    finally:
+        _cleanup_upload(fasta_path)
+
+
+def _hmmsearch(fasta_path: Path) -> dict:
     if not HMM_DB.exists():
         raise RuntimeError(
             f"HMM database not found at {HMM_DB}. "
@@ -146,6 +180,13 @@ def run_foldseek(pdb_path: str) -> dict:
     """Run foldseek easy-search of the query structure against the
     268-structure EVADES Foldseek database and return parsed hits."""
     pdb_path = Path(pdb_path)
+    try:
+        return _foldseek(pdb_path)
+    finally:
+        _cleanup_upload(pdb_path)
+
+
+def _foldseek(pdb_path: Path) -> dict:
     if not FOLDSEEK_DB.with_suffix("").exists() and not Path(str(FOLDSEEK_DB)).exists():
         raise RuntimeError(
             f"Foldseek database not found at {FOLDSEEK_DB}. "
