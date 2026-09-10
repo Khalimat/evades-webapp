@@ -121,44 +121,83 @@ additive (more entries), not functional changes. Regenerate
 
 ## Going live (Kubernetes, at `www.ebi.ac.uk/finn-srv/evades/`)
 
+The predecessor site (`EBI-Metagenomics/anti_defence`) already ran at
+this exact URL on EBI's Kubernetes. Its manifest
+(`website/deployment/ebi-wp-k8s-hl.yaml` in that repo) is the template
+for this deployment, and the notes below are taken from it.
+
+### The URL prefix — stripped before it reaches the app
+
+`www.ebi.ac.uk` routes `/finn-srv/evades/...` to the cluster through an
+ingress-nginx rule that **removes the prefix**:
+
+```yaml
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  rules:
+    - host: www.ebi.ac.uk
+      http:
+        paths:
+          - path: /finn-srv/evades(/|$)(.*)   # $2 = everything after the prefix
+```
+
+So a request for `…/finn-srv/evades/api/health` arrives at the backend
+as `/api/health`. Consequences:
+
+- **`nginx/default.conf` needs no changes** — it stays rooted at `/`.
+- **HTTPS is terminated upstream** by EBI's www tier; the ingress has
+  no TLS block and the app manages no certificates (no Caddy).
+- Only the **browser-facing HTML** has to carry the prefix, so that the
+  browser's *next* request goes back through `/finn-srv/evades/...`
+  (steps 2–3 below). There is no `BASE_URL`-style env var for this app;
+  the prefix lives in `<base href>` and the generator's `SCRIPT_PREFIX`.
+
 ### How the containers map to Kubernetes
 
-The `docker-compose.yml` service graph maps directly onto Kubernetes
-resources:
+`docker-compose.yml` is a single-VM stand-in; on the cluster it becomes:
 
-| Compose service | Kubernetes |
-|---|---|
-| nginx | Deployment + Service, behind the cluster Ingress (TLS terminated at the Ingress — no Caddy needed) |
-| frontend / explore pages | files served by nginx; baked into the nginx image or mounted from a volume |
-| api | Deployment + Service |
-| worker | Deployment with `replicas: N` — the concurrency knob (the equivalent of Compose's `--scale worker=N`) |
-| redis | Deployment + Service (ephemeral — the queue does not need to survive a restart) |
-| postgres | StatefulSet + PVC, or a managed database |
-| `./data` bind mount | ReadOnlyMany PVC or object-store sync, populated out of band — see [Reference data](#reference-data-not-in-git) |
-| `CORS_ORIGINS` (`.env`) | env var on the api Deployment, set to `https://www.ebi.ac.uk` |
+| Compose service | Kubernetes | Notes |
+|---|---|---|
+| nginx | Deployment + Service (`NodePort`, as in the anti_defence manifest) | the Ingress `backend.service` points here |
+| frontend / explore pages | files inside the nginx image | rebuilt on change; acceptable given ~annual updates |
+| api | Deployment + ClusterIP Service (`:8000`) | readiness probe on `/api/health` |
+| worker | Deployment, `replicas: N` | queue consumer, no Service; the concurrency knob (`--scale worker=N`) |
+| redis | Deployment + ClusterIP Service | ephemeral — no PVC |
+| postgres | StatefulSet + PVC (`ReadWriteOnce`) + a `Secret` for the password | or a managed instance; the old site used sqlite-on-NFS and has no equivalent to copy |
+| `/data/uploads` | `ReadWriteMany` NFS PVC shared by api + worker | or co-locate api + worker in one Pod sharing an `emptyDir` (simpler; gives up independent worker scaling) |
+| `/data` reference data | `ReadOnlyMany` NFS PV/PVC — see below | |
 
-### The URL prefix
+### Reference data on the cluster — a static NFS volume
 
-The app will be served under a path, `/finn-srv/evades/`, not at a
-domain root. `www.ebi.ac.uk` is a front proxy that forwards that path
-to the service. It can do this in one of two ways, and the first
-question to settle with the EBI web team is **which**:
+This is the no-SSH delivery path. The anti_defence manifest mounts a
+statically-provisioned NFS volume:
 
-- **Prefix stripped** (recommended) — the proxy removes
-  `/finn-srv/evades` before forwarding, so the backend still sees
-  requests at `/`. nginx needs **no changes**; only the browser-facing
-  HTML has to carry the prefix (steps 2–3).
-- **Prefix preserved** — the backend receives the full
-  `/finn-srv/evades/...` path and nginx must be taught about it
-  (step 4).
+```yaml
+kind: PersistentVolume
+spec:
+  accessModes: [ReadOnlyMany]
+  mountOptions: [nfsvers=3]
+  nfs:
+    server: hh-isi-srv-vlan1496.ebi.ac.uk
+    path: /ifs/public/services/metagenomics/evades/dbs
+```
 
-Either way, `frontend/index.html` and the Explore pages must be built
-for the new location, because they emit absolute URLs.
+The web team places the files on that export; pods mount it read-only.
+The old site then had a busybox **initContainer** copy them to a local
+`emptyDir` (sqlite needs a writable file) — the HMM and Foldseek
+databases here are genuinely read-only at query time, so api/worker can
+mount the NFS PVC directly and skip the copy. Size the PV/PVC to the
+data (a few hundred MB today; the old `1Gi` is on the low side — use
+2–5Gi).
 
 ### Steps
 
-1. **Settle the prefix behaviour** with the EBI web team (see above).
-   Everything below follows from that answer.
+1. **Coordinate with the EBI web team** on the namespace (`evades`),
+   the Ingress rule (reuse the pattern above, pointed at the nginx
+   Service), and the NFS export path for the reference data.
 2. **Set the frontend base path.** In `frontend/index.html`, change
    `<base href="/">` to `<base href="/finn-srv/evades/">`. Every link
    in `index.html` / `app.js` is relative, so that is the only change
@@ -170,25 +209,28 @@ for the new location, because they emit absolute URLs.
    — see `generator/README.md`. The generated HTML bakes in absolute
    paths, so a build made for local `/explore/` will 404 its CSS and
    links under `/finn-srv/evades/`.
-4. **Only if the prefix is preserved:** in `nginx/default.conf`, move
-   every `location` under the prefix
-   (`/finn-srv/evades/`, `/finn-srv/evades/api/`,
-   `/finn-srv/evades/downloads/`, `/finn-srv/evades/explore/`),
-   keeping `proxy_pass http://api:8000/api/;` as-is. If the prefix is
-   stripped, leave this file untouched.
-5. **Set CORS.** `CORS_ORIGINS=https://www.ebi.ac.uk` on the api
-   Deployment.
-6. **Create the Kubernetes resources** per the mapping table above:
-   Deployments + Services for nginx, api, worker, redis; StatefulSet +
-   PVC (or a managed DB) for postgres; a ReadOnlyMany PVC (or
-   object-store sync) for `/data`; and the Ingress / front-proxy route
-   for `/finn-srv/evades/`.
-7. **Load the data that isn't in git** — the `/data` contents and
-   `frontend/explore/` — via the object-store or populated-volume
-   mechanism the team sets up (there is no SSH). See
-   [Reference data](#reference-data-not-in-git).
-8. **Deploy** by merging to `main`: CI builds the images, the rollout
-   picks them up.
+4. **Set CORS.** `CORS_ORIGINS=https://www.ebi.ac.uk,https://evades.mgnify.org`
+   on the api Deployment — the anti_defence config allowed both
+   `www.ebi.ac.uk` and the `evades.mgnify.org` vanity domain.
+5. **Build and publish the images.** The anti_defence site built on
+   push to `main` and pushed to `quay.io/microbiome-informatics/…`,
+   pulled in-cluster with an `imagePullSecrets` entry. Mirror that for
+   the `api`/`worker`/`nginx` images (this repo's CI already builds
+   them; add the registry push).
+6. **Create the Kubernetes resources** per the table above: Deployments
+   + Services for nginx / api / redis, a Deployment for worker, a
+   StatefulSet + PVC (or managed DB) for postgres, the `ReadOnlyMany`
+   NFS PV/PVC for `/data`, an upload volume shared by api + worker, and
+   the Ingress. (Outbound internet on the cluster only works via the
+   proxy `http://hh-wwwcache.ebi.ac.uk:3128` — this app makes no
+   outbound calls at runtime, so that is not needed here.)
+7. **Load the reference data** onto the NFS export (step 1) — the
+   `data/hmm`, `data/foldseek`, and `data/downloads` contents. The
+   Explore pages ship in the nginx image, so a data-only refresh is
+   just replacing files on the export; a dataset change also means a
+   new nginx image (step 3 + step 5).
+8. **Deploy** by merging to `main`: CI builds and pushes the images,
+   the rollout picks them up.
 9. **Verify:** `https://www.ebi.ac.uk/finn-srv/evades/` loads;
    `…/api/health` returns `{"status": "ok"}`; a test HMM search and a
    test structure search both complete; `…/explore/protein_list/`
