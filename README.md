@@ -1,157 +1,152 @@
 # EVADES web app
 
-Self-hosted companion site for the EVADES database: bulk downloads,
-an "Explore" tab (the protein browser, statically generated — see
-`generator/README.md`), and an "Analyse" tab (HMM search via HMMER,
-structure search via Foldseek). No dependency on EBI infrastructure —
-runs entirely in Docker Compose, portable to any VM (Hetzner,
-DigitalOcean, or later EMBL-EBI's Embassy Cloud).
+Self-hosted companion site for the EVADES database of anti-defence
+proteins (ADPs). It offers three things:
+
+- **Browse** — one page per ADP, pre-rendered as static HTML from the
+  EVADES dataset (see `generator/README.md`).
+- **Analyse** — search your own data against EVADES: profile HMM
+  search (HMMER `hmmsearch`) against the EVADES HMM library, and
+  structure search (Foldseek) against the EVADES structure set.
+- **Download** — bulk data files (sequences, metadata, structures, HMM
+  profiles).
+
+The site has no runtime dependency on EBI infrastructure. It is a
+small set of containers defined in `docker-compose.yml`: run locally
+with Docker Compose for development, deployed to Kubernetes
+(EMBL-EBI) for production.
 
 ## Architecture
 
-```
- browser
-    |
-  nginx  (reverse proxy, port 8080)
-    |
-    +--> static frontend (HTML/JS)
-    +--> /explore/* --> statically-rendered protein browser (frontend/explore/)
-    +--> /api/*  --> api (FastAPI)
-    |                  |
-    |               enqueues job
-    |                  v
-    |                redis (job queue)
-    |                  ^
-    |               picks up job
-    |                  |
-    +--> /downloads --> worker (FastAPI code + HMMER + Foldseek)
-                           |
-                        reads /data (HMM DB, Foldseek DB)
-                           |
-                        writes results to Postgres via api's DB
+Every box below is one container. `docker-compose.yml` is the
+authoritative list.
+
+| Component | Role |
+|---|---|
+| **nginx** | The only entry point. Routes by URL path: the static frontend, the `/explore/` pages, the `/downloads/` files, and `/api/` to the api container. |
+| **frontend** | Static HTML/JS (`frontend/`), served straight from disk by nginx. No build step. |
+| **explore pages** | Pre-rendered per-protein HTML (`frontend/explore/`), generated offline — not built at deploy time. Served by nginx. |
+| **api** (FastAPI) | Accepts an upload, validates it, and puts a job on the queue. Returns a job id immediately. Never runs HMMER or Foldseek itself; reads job status and results back from Postgres. |
+| **redis** | Holds the [RQ](https://python-rq.org/) job queue. Decouples "user clicked Run" from "a search is actually running". |
+| **worker** | The only place HMMER and Foldseek run. Takes a job off the queue, runs the tool against the databases in `/data`, writes the parsed result to Postgres. This is the piece you scale for concurrency. |
+| **postgres** | Job bookkeeping only — job id, type, status, result JSON. No scientific data. Reproducible and safe to lose. |
+| **/data** | Reference data mounted read-only into api / worker / nginx: the pressed HMM library, the Foldseek database, and the bulk-download files. Not in git — see [Reference data](#reference-data-not-in-git). |
+
+```mermaid
+flowchart TD
+    B([Browser])
+    N[nginx]
+    F[static frontend]
+    E[explore pages]
+    A[api — FastAPI]
+    Q[[redis — RQ queue]]
+    W[worker — HMMER + Foldseek]
+    P[(postgres — job records)]
+    D[/"data: HMM DB, Foldseek DB, downloads"/]
+
+    B --> N
+    N -->|"/"| F
+    N -->|"/explore/"| E
+    N -->|"/downloads/"| D
+    N -->|"/api/"| A
+    A -->|enqueue| Q
+    Q -->|dequeue| W
+    W -->|read| D
+    W -->|"write result"| P
+    A -->|"read status / result"| P
 ```
 
-The `api` container never runs HMMER/Foldseek itself — it only
-enqueues jobs onto a Redis queue (via [RQ](https://python-rq.org/)).
-The `worker` container is the only place those tools run, and it's
-the piece you scale for concurrency — see "Handling concurrent
-requests" below.
+A search, end to end:
+
+1. The browser uploads a FASTA (HMM search) or a PDB/mmCIF file
+   (structure search) to `POST /api/search/hmm` or
+   `POST /api/search/structure`.
+2. `api` validates the file, saves it to the shared uploads volume,
+   enqueues a job on redis, writes a `queued` row to Postgres, and
+   returns a job id right away.
+3. A free `worker` picks up the job, runs `hmmsearch` or `foldseek`
+   against `/data`, and writes the result to Postgres.
+4. The browser polls `GET /api/jobs/{id}` until the status is
+   `finished` (or `failed`), then renders the result.
+
+Step 2 returns instantly no matter how busy the system is, so
+submissions never block or fail under load — they queue. How many run
+in parallel rather than wait depends only on the number of `worker`
+replicas.
 
 ## Quick start (local)
 
-1. Build the databases — see `data/README.md`.
-2. `cp .env.example .env` and adjust if needed (defaults work for local dev).
+1. Put the reference data in place — see `data/README.md` and
+   [Reference data](#reference-data-not-in-git).
+2. `cp .env.example .env` (the defaults are fine for local dev).
 3. `docker compose up --build`
-4. Visit `http://localhost:8080`
+4. Open `http://localhost:8080`.
 
-## Handling concurrent requests
-
-The job queue (Redis + RQ) already decouples "someone hit Run search"
-from "an HMMER/Foldseek process is actually running" — the `api`
-container enqueues instantly regardless of load, so submissions never
-block or fail under concurrency, they just queue up. Whether they
-queue *and wait* or run *in parallel* depends only on how many
-`worker` containers are up:
+Backend tests and lint:
 
 ```bash
-docker compose up -d --scale worker=3
+cd backend
+pip install -r requirements-dev.txt
+ruff check . && pytest
 ```
 
-No code or compose-file changes needed for this — verified locally by
-submitting 3 searches at once with `--scale worker=3` and confirming
-via `docker compose logs worker` that all three were picked up by
-different worker containers at the same timestamp, not processed one
-after another.
+CI (`.github/workflows/ci.yml`) runs the same checks plus a Docker
+image build on every push and pull request.
 
-Each search job is capped at 2 threads (`hmmsearch --cpu 2`,
-`foldseek --threads 2`), so worker replicas don't fight each other for
-every core on the box. Size the VPS accordingly:
+## Reference data (not in git)
 
-**vCPUs needed ≈ 2 × the number of searches you want to run genuinely
-in parallel.** E.g. 4 vCPUs comfortably runs 2 worker replicas; 8
-vCPUs runs 4. Anything beyond that just queues (a few seconds' wait,
-not a failure) until a worker frees up.
+Four artifacts are generated or scientific data, not source. They are
+gitignored and delivered separately from the code:
 
-This is the same mechanism that carries over to EBI's Kubernetes
-later — `replicas: N` on the worker Deployment instead of `--scale`,
-nothing else changes.
+| Path | What | Produced by |
+|---|---|---|
+| `data/hmm/evades_profiles.hmm*` | Pressed HMM profile library | `data/README.md` |
+| `data/foldseek/evades_structures_db*` | Foldseek database (268 structures) | `foldseek createdb`, per `data/README.md` |
+| `data/downloads/*` | The four bulk-download files | dataset export |
+| `frontend/explore/` | Pre-rendered Browse pages | `generator/export_static.py` — see `generator/README.md` |
 
-## What to fill in before deploying for real
+For local development, drop each at the path above. For the
+Kubernetes deployment they need an **out-of-band delivery path** —
+an object store the pods sync from, or a pre-populated volume —
+because there is no SSH access to the running service. Wiring this up
+is the main open item for the production move.
 
-- [ ] `data/hmm/evades_profiles.hmm` — your pressed HMM library
-- [ ] `data/foldseek/evades_structures_db*` — your Foldseek DB of 268 structures
-- [ ] `data/downloads/*` — the four bulk-download files
-- [ ] `frontend/explore/` — the pre-rendered Explore pages (`generator/export_static.py`; see `generator/README.md`)
-- [ ] `.env` with `DOMAIN=your.real.domain` — see "Deploying to a public server"
+Updates to this data are expected roughly once a year and are
+additive (more entries), not functional changes. Regenerate
+`frontend/explore/` and the Foldseek DB **together** from the dataset
+— see the blob-wipe footgun documented in `generator/README.md`.
 
-CORS and HTTPS are both handled by `docker-compose.prod.yml` (below) —
-nothing to hand-edit in `backend/app/main.py`.
+## Deployment (Kubernetes, EMBL-EBI)
 
-## Deploying to a public server
+The `docker-compose.yml` service graph maps directly onto Kubernetes
+resources:
 
-Already have a server running? See `OPERATIONS.md` for accessing it
-and pushing updates — this section is about setting up a new one.
+| Compose service | Kubernetes |
+|---|---|
+| nginx | Deployment + Service, behind the cluster Ingress (TLS terminated at the Ingress — no Caddy needed) |
+| frontend / explore pages | files served by nginx; baked into the nginx image or mounted from a volume |
+| api | Deployment + Service |
+| worker | Deployment with `replicas: N` — this is the concurrency knob (the equivalent of Compose's `--scale worker=N`) |
+| redis | Deployment + Service (ephemeral — the queue does not need to survive a restart) |
+| postgres | StatefulSet + PVC, or a managed database |
+| `./data` bind mount | ReadOnlyMany PVC or object-store sync, populated out of band — see [Reference data](#reference-data-not-in-git) |
+| `CORS_ORIGINS` (`.env`) | env var on the api Deployment, set to the public origin |
 
-Nothing about this repo is unusual — it's meant to be portable to any
-VM. [Hetzner Cloud](https://www.hetzner.com/cloud/) is the recommended
-option: a CX22 (2 vCPU/4GB/40GB, ~€3.79/mo) covers low/no concurrent
-traffic; a CX32 (4 vCPU/8GB, ~€7.55/mo) comfortably runs 2 worker
-replicas in parallel — see "Handling concurrent requests" above for
-sizing beyond that.
+Operational model:
 
-1. **Create the server.** Sign up, add an SSH key, create a CX22 or
-   CX32 instance (Ubuntu 24.04 image). Note its IP.
-2. **Get a domain and point it at the server.** Buy one anywhere, add
-   an A record to the VM's IP. DNS propagation can take minutes to
-   hours — do this early so it's ready by step 6.
-3. **SSH in and install Docker:**
-   ```bash
-   ssh root@<server-ip>
-   curl -fsSL https://get.docker.com | sh
-   ```
-4. **Get the code onto the server:**
-   ```bash
-   git clone git@github.com:Khalimat/evades-webapp.git
-   cd evades-webapp
-   ```
-   (needs a deploy key or token if the repo is private — GitHub's docs
-   cover that; simplest is generating a new SSH key on the server and
-   adding it to the repo's Deploy keys.)
-5. **Move the data that isn't in git**, from your Mac:
-   ```bash
-   rsync -avz data/hmm data/foldseek data/downloads frontend/explore \
-     root@<server-ip>:~/evades-webapp/data/  # adjust destination per dir — see note below
-   ```
-   `data/hmm/`, `data/foldseek/`, `data/downloads/`, and
-   `frontend/explore/` are all gitignored (large generated/scientific
-   artifacts, not source). `frontend/explore/` goes to
-   `evades-webapp/frontend/explore/`, not under `data/` — run the
-   `rsync` per-directory to its matching path, or `tar czf - data
-   frontend/explore | ssh root@<server-ip> 'cd evades-webapp && tar
-   xzf -'` to move everything in one shot.
-6. **Configure the domain:**
-   ```bash
-   cp .env.example .env
-   # edit .env: DOMAIN=your.real.domain
-   ```
-7. **Open the firewall** (Hetzner Cloud Firewall, or `ufw` on the
-   server) for ports **22, 80, 443** only — nothing else needs to be
-   public.
-8. **Bring it up:**
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-   ```
-   This adds [Caddy](https://caddyserver.com/) in front of `nginx`,
-   which automatically requests and renews a Let's Encrypt cert for
-   `DOMAIN` (needs step 2's DNS to have propagated first), and sets
-   `CORS_ORIGINS=https://$DOMAIN` on the `api` container. Check
-   `docker compose ps` and `docker compose logs caddy`, then visit
-   `https://your.real.domain`.
+- **No SSH, no in-place edits.** All changes ship through git:
+  PR → review → merge → CI builds images → rollout.
+- **Concurrency.** Each job is capped at 2 threads
+  (`hmmsearch --cpu 2`, `foldseek --threads 2`), so replicas don't
+  fight over every core. Rule of thumb: **worker CPU ≈ 2 × the number
+  of searches you want running genuinely in parallel.** Past that,
+  jobs wait in the queue for a few seconds rather than failing. For
+  the expected traffic one worker replica is enough; raise `replicas`
+  if that changes.
+- **State.** Only Postgres and the uploads volume hold state, and
+  neither holds scientific data — job rows are bookkeeping, uploads
+  are transient. Everything else is reproducible from git plus the
+  reference data. Backups are optional.
 
-For local dev, keep using plain `docker compose up --build` (no
-`-f docker-compose.prod.yml`) — that's unaffected by any of this.
-
-The only optional extra step is migrating the Postgres volume if you
-want job history to persist across the move (`pg_dump`/`pg_restore`)
-— job records are just bookkeeping, not scientific data, so this is
-skippable.
+`OPERATIONS.md` describes the current interim single-VM deployment;
+it will be superseded once the Kubernetes deployment is in place.
