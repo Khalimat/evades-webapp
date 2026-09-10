@@ -9,10 +9,12 @@ Reference for the deployed instance. See `README.md` for setting up a
 - **IP**: `167.233.198.65` (check the server's page in the
   [Hetzner console](https://console.hetzner.cloud/) if this ever
   changes — e.g. after recreating the server)
-- **URL**: `https://167-233-198-65.sslip.io` — a free "magic" DNS
-  service that resolves `<ip-with-dashes>.sslip.io` straight to that
-  IP, no registration needed. If you later point a real domain at the
-  server instead, see "Changing the domain" below.
+- **URL**: `https://evades.app` — a real domain with an A record
+  pointed at the IP above; Caddy holds its Let's Encrypt cert. This is
+  set by `DOMAIN=` in `.env` on the server, and the Caddyfile serves
+  only that one name — the old `167-233-198-65.sslip.io` address no
+  longer has a cert and fails the TLS handshake. To change the domain
+  again, see "Changing the domain" below.
 - **Firewall**: only ports 22 (SSH), 80 (HTTP, needed for Let's
   Encrypt), 443 (HTTPS) are open.
 - **Repo**: private, cloned via HTTPS with a GitHub personal access
